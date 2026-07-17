@@ -9,6 +9,7 @@
 - Diagnóstico de binarios y modelos configurados.
 - Modo no interactivo supervisable por systemd y apagado mediante señales.
 - El workflow ejecuta el script de despliegue perteneciente a la revisión validada.
+- Instalación y despliegue habilitan el servicio para iniciar con EC2.
 
 ## 0.1.0 - 2026-07-17
 

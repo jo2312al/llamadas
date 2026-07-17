@@ -33,6 +33,7 @@ python3.11 -m venv .venv
 .venv/bin/pip install --disable-pip-version-check -r requirements.txt
 .venv/bin/python -m aplicacion.principal migrar --configuracion configuracion/configuracion.yaml
 sudo install -d -o agente-hotel -g agente-hotel -m 0770 datos registros respaldos
+sudo systemctl enable agente-telefonico.service
 sudo systemctl restart agente-telefonico.service
 sudo systemctl is-active --quiet agente-telefonico.service
 .venv/bin/python -m aplicacion.principal salud --configuracion configuracion/configuracion.yaml
