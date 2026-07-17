@@ -16,6 +16,7 @@
 - Margen de Whisper ajustado para la contención de CPU durante llamadas concurrentes.
 - Clasificador local seguro para mantener el servicio operativo cuando Ollama está desactivado.
 - Publicador telefónico con acceso mínimo mediante el grupo local de Asterisk.
+- Eventos tardíos de reproducción tolerados cuando el canal ya fue colgado.
 
 ## 0.3.0 - 2026-07-17
 

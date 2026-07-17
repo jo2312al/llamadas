@@ -3,6 +3,7 @@
 import asyncio
 import contextlib
 import logging
+import re
 from pathlib import Path
 from uuid import uuid4
 
@@ -78,7 +79,13 @@ class OrquestadorAri:
                 REGISTRO.info("Sesión de llamada finalizada", extra={"llamada": canal})
         elif evento.tipo == TipoEvento.REPRODUCCION_TERMINADA and self.whisper:
             if self.gestor.obtener(canal):
-                self._iniciar_grabacion(canal)
+                try:
+                    self._iniciar_grabacion(canal)
+                except ErrorAsterisk:
+                    REGISTRO.info(
+                        "El canal terminó antes de iniciar una nueva escucha",
+                        extra={"llamada": canal},
+                    )
         elif evento.tipo == TipoEvento.GRABACION_TERMINADA and self.whisper:
             self._transcribir(evento)
 
@@ -168,10 +175,10 @@ class OrquestadorAri:
 
 def clasificar_turno_local(mensaje: str) -> tuple[str, str]:
     """Clasifica intenciones básicas sin inferencia ni decisiones sensibles."""
-    normalizado = mensaje.casefold()
-    if any(palabra in normalizado for palabra in ("recepción", "humano", "persona")):
+    palabras = set(re.findall(r"\w+", mensaje.casefold()))
+    if palabras.intersection({"recepción", "humano", "persona"}):
         return "transferencia", "Claro. Le comunicaré con recepción."
-    if any(palabra in normalizado for palabra in ("reserv", "habitación", "hosped")):
+    if any(palabra.startswith(("reserv", "habitaci", "hosped")) for palabra in palabras):
         return "reservacion", "Con gusto. ¿Para qué fecha desea reservar?"
     return "informacion", "Con gusto. ¿Qué información del hotel necesita?"
 

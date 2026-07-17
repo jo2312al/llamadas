@@ -125,6 +125,19 @@ def test_transcripcion_genera_y_reproduce_respuesta(tmp_path) -> None:
 
 
 def test_clasificador_local_no_inventa_datos() -> None:
-    intencion, respuesta = clasificar_turno_local("Quiero reservar una habitación")
+    intencion, respuesta = clasificar_turno_local(
+        "Quiero reservar una habitación para dos personas"
+    )
     assert intencion == "reservacion"
     assert respuesta == "Con gusto. ¿Para qué fecha desea reservar?"
+
+
+def test_canal_cerrado_al_reanudar_escucha_no_detiene_servicio() -> None:
+    cliente = Mock()
+    cliente.grabar.side_effect = ErrorAsterisk("HTTP 404")
+    gestor = GestorSesiones()
+    gestor.crear("canal-1")
+    OrquestadorAri(cliente, gestor, whisper=Mock()).procesar(
+        evento(TipoEvento.REPRODUCCION_TERMINADA)
+    )
+    assert gestor.obtener("canal-1") is not None
