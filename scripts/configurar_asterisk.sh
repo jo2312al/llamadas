@@ -26,7 +26,7 @@ sudo install -m 0640 -o asterisk -g asterisk "${temporal}" "${DESTINO}/ari.conf"
 entorno_temporal="$(mktemp)"
 trap 'rm -f "${temporal}" "${entorno_temporal}"' EXIT
 archivo_entorno="/etc/agente-telefonico/agente-telefonico.env"
-sudo install -d -m 0750 /etc/agente-telefonico
+sudo install -d -m 0750 -o root -g agente-hotel /etc/agente-telefonico
 if sudo test -f "${archivo_entorno}"; then
   sudo grep -Ev '^AGENTE_ARI_(USUARIO|PASSWORD)=' "${archivo_entorno}" >"${entorno_temporal}" || true
 fi

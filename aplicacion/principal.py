@@ -1,6 +1,8 @@
 """Interfaz CLI para operar y diagnosticar el núcleo."""
 
 import argparse
+import asyncio
+import contextlib
 import shutil
 import signal
 import sqlite3
@@ -9,8 +11,11 @@ import time
 from pathlib import Path
 
 from aplicacion.base_datos.conexion import conectar, migrar
-from aplicacion.configuracion import cargar_configuracion
+from aplicacion.configuracion import Configuracion, cargar_configuracion
 from aplicacion.telefonia.cliente_asterisk import ClienteAsterisk, ErrorAsterisk
+from aplicacion.telefonia.eventos_ari import ReceptorEventosAri
+from aplicacion.telefonia.orquestador_ari import OrquestadorAri, ejecutar_eventos_ari
+from aplicacion.telefonia.sesion_llamada import GestorSesiones
 
 
 def ejecutar_servicio(ruta_configuracion: Path) -> None:
@@ -33,6 +38,9 @@ def ejecutar_servicio(ruta_configuracion: Path) -> None:
     conexion = conectar(configuracion.ruta_base_datos)
     migrar(conexion, Path("migraciones"))
     conexion.close()
+    if configuracion.contrasena_ari:
+        asyncio.run(_ejecutar_servicio_ari(configuracion))
+        return
     terminar = False
 
     def solicitar_salida(_senal: int, _marco: object) -> None:
@@ -45,6 +53,32 @@ def ejecutar_servicio(ruta_configuracion: Path) -> None:
     while not terminar:
         time.sleep(1)
     print("Servicio del agente telefónico detenido", flush=True)
+
+
+async def _ejecutar_servicio_ari(configuracion: Configuracion) -> None:
+    """Ejecuta el consumidor ARI hasta recibir SIGTERM o SIGINT."""
+    if not configuracion.contrasena_ari:
+        raise ValueError("La configuración ARI está incompleta")
+    secreto = configuracion.contrasena_ari.get_secret_value()
+    cliente = ClienteAsterisk(configuracion.url_ari, configuracion.usuario_ari, secreto)
+    receptor = ReceptorEventosAri(
+        configuracion.url_ari,
+        configuracion.aplicacion_ari,
+        configuracion.usuario_ari,
+        secreto,
+    )
+    gestor = GestorSesiones(configuracion.duracion_maxima_llamada_segundos)
+    detener = asyncio.Event()
+    bucle = asyncio.get_running_loop()
+    for senal in (signal.SIGTERM, signal.SIGINT):
+        with contextlib.suppress(NotImplementedError):
+            bucle.add_signal_handler(senal, detener.set)
+    print("Servicio ARI del agente telefónico iniciado", flush=True)
+    try:
+        await ejecutar_eventos_ari(receptor, OrquestadorAri(cliente, gestor), detener)
+    finally:
+        cliente.cerrar()
+        print("Servicio ARI del agente telefónico detenido", flush=True)
 
 
 def verificar_salud(ruta_configuracion: Path) -> int:

@@ -10,7 +10,7 @@ sudo usermod -aG agente-hotel "${USER}"
 sudo install -d -o "${USER}" -g agente-hotel -m 0750 /opt/agente-telefonico-hotel
 sudo install -d -o agente-hotel -g agente-hotel -m 0770 /opt/agente-telefonico-hotel/{datos,registros,respaldos}
 sudo install -m 0644 systemd/agente-telefonico.service /etc/systemd/system/agente-telefonico.service
-sudo install -d -m 0750 /etc/agente-telefonico
+sudo install -d -m 0750 -o root -g agente-hotel /etc/agente-telefonico
 if [[ ! -f /etc/agente-telefonico/agente-telefonico.env ]]; then
   sudo install -m 0640 -o root -g agente-hotel systemd/agente-telefonico.env.example /etc/agente-telefonico/agente-telefonico.env
 fi

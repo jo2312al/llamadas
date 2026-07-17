@@ -12,6 +12,7 @@
 - Espera acotada de disponibilidad ARI después de reiniciar Asterisk.
 - Cliente WebSocket autenticado para eventos ARI con reintentos finitos.
 - Credencial ARI transferida al entorno protegido del servicio y diagnóstico autenticado.
+- Orquestador idempotente de StasisStart/StasisEnd y cierre de llamadas vencidas.
 
 ## 0.2.0 - 2026-07-17
 
