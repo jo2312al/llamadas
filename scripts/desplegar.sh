@@ -31,9 +31,10 @@ git fetch --prune origin
 git checkout --detach "${REVISION}"
 python3.11 -m venv .venv
 .venv/bin/pip install --disable-pip-version-check -r requirements.txt
+sudo install -d -o agente-hotel -g agente-hotel -m 0770 datos registros respaldos
+sudo chown -R agente-hotel:agente-hotel datos
 sudo -u agente-hotel .venv/bin/python -m aplicacion.principal migrar \
   --configuracion configuracion/configuracion.yaml
-sudo install -d -o agente-hotel -g agente-hotel -m 0770 datos registros respaldos
 sudo usermod -a -G asterisk agente-hotel
 sudo install -d -o agente-hotel -g asterisk -m 0750 /var/lib/asterisk/sounds/hotel/generado
 sudo systemctl enable agente-telefonico.service
