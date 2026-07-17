@@ -7,6 +7,8 @@
 - Sesiones independientes y seguras para concurrencia.
 - Transferencia PJSIP controlada y límite máximo de duración.
 - Pruebas ARI simuladas sin llamadas ni puertos públicos.
+- Instalador reproducible de Asterisk 22.10.1 con SHA-256 fijada.
+- Plantillas ARI limitadas a localhost y dialplan de laboratorio.
 
 ## 0.2.0 - 2026-07-17
 

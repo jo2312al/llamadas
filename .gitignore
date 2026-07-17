@@ -14,3 +14,4 @@ registros/*
 !registros/.gitkeep
 respaldos/
 *.pem
+asterisk/ari.conf

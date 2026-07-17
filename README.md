@@ -86,7 +86,10 @@ de ruta y las transferencias solo aceptan endpoints SIP/PJSIP validados. Las pru
 `httpx.MockTransport` y nunca originan llamadas.
 
 Amazon Linux 2023 no publica Asterisk en los repositorios habilitados de esta VM. Antes
-de llamadas controladas se debe instalar una versión LTS desde una fuente verificada,
+de llamadas controladas se instala Asterisk 22.10.1 LTS desde la fuente oficial,
+verificada con SHA-256 fija mediante `make instalar-asterisk`. Después defina
+`ASTERISK_ARI_PASSWORD` con 32 caracteres seguros y ejecute `make configurar-asterisk`.
+El script respalda configuraciones existentes antes de sustituirlas. Se debe
 mantener ARI en `127.0.0.1:8088`, crear credenciales fuera de Git y configurar el
 dialplan `Stasis(agente-hotel)`. La recepción debe probarse primero con un endpoint de
 laboratorio.

@@ -1,0 +1,25 @@
+[Unit]
+Description=Asterisk PBX
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=asterisk
+Group=asterisk
+ExecStart=/usr/sbin/asterisk -mqf -U asterisk -G asterisk
+ExecReload=/usr/sbin/asterisk -rx "core reload"
+ExecStop=/usr/sbin/asterisk -rx "core stop now"
+Restart=on-failure
+RestartSec=5
+RuntimeDirectory=asterisk
+RuntimeDirectoryMode=0750
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/var/lib/asterisk /var/log/asterisk /var/spool/asterisk /run/asterisk
+LimitNOFILE=8192
+
+[Install]
+WantedBy=multi-user.target

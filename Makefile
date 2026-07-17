@@ -1,4 +1,4 @@
-.PHONY: instalar formato validar probar ejecutar migrar desplegar estado respaldar
+.PHONY: instalar formato validar probar ejecutar migrar desplegar estado respaldar instalar-asterisk configurar-asterisk
 instalar:
 	python -m pip install -r requirements-dev.txt
 formato:
@@ -20,3 +20,7 @@ estado:
 	./scripts/verificar_estado.sh
 respaldar:
 	./scripts/respaldar_base_datos.sh
+instalar-asterisk:
+	./scripts/instalar_asterisk.sh
+configurar-asterisk:
+	./scripts/configurar_asterisk.sh
