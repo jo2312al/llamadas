@@ -30,3 +30,6 @@ instalar-piper:
 	./scripts/instalar_piper.sh
 preparar-audios:
 	./scripts/preparar_audios.sh
+
+instalar-ollama:
+	./scripts/instalar_ollama.sh

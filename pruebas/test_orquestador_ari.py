@@ -5,6 +5,7 @@ from unittest.mock import Mock
 
 import pytest
 
+from aplicacion.lenguaje.esquemas_ollama import RespuestaOllama
 from aplicacion.reconocimiento_voz.servicio_whisper import Transcripcion
 from aplicacion.telefonia.cliente_asterisk import ErrorAsterisk
 from aplicacion.telefonia.eventos_llamada import EventoLlamada, TipoEvento
@@ -85,3 +86,39 @@ def test_fin_de_grabacion_transcribe_y_actualiza_sesion(tmp_path) -> None:
     cliente.descargar_grabacion.assert_called_once_with("hotel-abc", tmp_path / "hotel-abc.wav")
     cliente.eliminar_grabacion.assert_called_once_with("hotel-abc")
     assert gestor.obtener("canal-1").ultimo_mensaje == "Quiero reservar una habitación"
+
+
+def test_transcripcion_genera_y_reproduce_respuesta(tmp_path) -> None:
+    cliente, whisper, ollama, piper, publicador = (Mock() for _ in range(5))
+    whisper.transcribir.return_value = Transcripcion("Quiero reservar")
+    ollama.analizar.return_value = RespuestaOllama(
+        intencion="reservacion",
+        confianza=0.95,
+        accion_sugerida="preguntar_campo",
+        texto_respuesta="Con gusto. ¿Para qué fecha desea reservar?",
+    )
+    piper.sintetizar.return_value = tmp_path / ("a" * 64 + ".wav")
+    publicador.publicar.return_value = "hotel/generado/abc"
+    gestor = GestorSesiones()
+    gestor.crear("canal-1")
+    orquestador = OrquestadorAri(
+        cliente,
+        gestor,
+        whisper=whisper,
+        ruta_grabaciones=tmp_path,
+        ollama=ollama,
+        piper=piper,
+        publicador=publicador,
+    )
+    orquestador.procesar(
+        EventoLlamada(
+            tipo=TipoEvento.GRABACION_TERMINADA,
+            identificador_canal="canal-1",
+            identificador_recurso="hotel-abc",
+        )
+    )
+    sesion = gestor.obtener("canal-1")
+    assert sesion is not None
+    assert sesion.intencion == "reservacion"
+    piper.sintetizar.assert_called_once_with("Con gusto. ¿Para qué fecha desea reservar?")
+    cliente.reproducir.assert_called_once_with("canal-1", "hotel/generado/abc")

@@ -12,6 +12,7 @@ from aplicacion.audio.convertidor_audio import guardar_pcm_como_wav
 from aplicacion.audio.detector_voz import ConfiguracionVoz, DetectorVoz, calcular_rms
 from aplicacion.reconocimiento_voz.servicio_whisper import ErrorWhisper, ServicioWhisper
 from aplicacion.sintesis_voz.cache_audio import CacheAudio
+from aplicacion.sintesis_voz.publicador_asterisk import PublicadorAudioAsterisk
 from aplicacion.sintesis_voz.servicio_piper import ServicioPiper
 
 
@@ -79,4 +80,20 @@ def test_piper_genera_y_reutiliza_cache(tmp_path: Path) -> None:
         primera = servicio.sintetizar("Buenos días")
         segunda = servicio.sintetizar("  buenos   DÍAS ")
     assert primera == segunda
+    assert proceso.call_count == 1
+
+
+def test_publica_audio_telefonico_para_asterisk(tmp_path: Path) -> None:
+    origen = tmp_path / ("a" * 64 + ".wav")
+    origen.write_bytes(b"R" * 45)
+    publicador = PublicadorAudioAsterisk(tmp_path / "sonidos")
+
+    def simular(comando: list[str], **_: object) -> None:
+        Path(comando[-1]).write_bytes(b"W" * 45)
+
+    with patch("subprocess.run", side_effect=simular) as proceso:
+        sonido = publicador.publicar(origen)
+        repetido = publicador.publicar(origen)
+    assert sonido == f"hotel/generado/{'a' * 64}"
+    assert repetido == sonido
     assert proceso.call_count == 1

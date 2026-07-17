@@ -13,7 +13,11 @@ from pathlib import Path
 
 from aplicacion.base_datos.conexion import conectar, migrar
 from aplicacion.configuracion import Configuracion, cargar_configuracion
+from aplicacion.lenguaje.cliente_ollama import ClienteOllama
 from aplicacion.reconocimiento_voz.servicio_whisper import ServicioWhisper
+from aplicacion.sintesis_voz.cache_audio import CacheAudio
+from aplicacion.sintesis_voz.publicador_asterisk import PublicadorAudioAsterisk
+from aplicacion.sintesis_voz.servicio_piper import ServicioPiper
 from aplicacion.telefonia.cliente_asterisk import ClienteAsterisk, ErrorAsterisk
 from aplicacion.telefonia.eventos_ari import ReceptorEventosAri
 from aplicacion.telefonia.orquestador_ari import OrquestadorAri, ejecutar_eventos_ari
@@ -83,6 +87,14 @@ async def _ejecutar_servicio_ari(configuracion: Configuracion) -> None:
         configuracion.modelo_whisper,
         configuracion.espera_whisper_segundos,
     )
+    ollama = ClienteOllama(configuracion.url_ollama, configuracion.modelo_ollama)
+    piper = ServicioPiper(
+        configuracion.binario_piper,
+        configuracion.modelo_piper,
+        CacheAudio(configuracion.ruta_cache_audio / "piper"),
+        configuracion.espera_piper_segundos,
+    )
+    publicador = PublicadorAudioAsterisk(Path("/var/lib/asterisk/sounds/hotel/generado"))
     detener = asyncio.Event()
     bucle = asyncio.get_running_loop()
     for senal in (signal.SIGTERM, signal.SIGINT):
@@ -98,6 +110,9 @@ async def _ejecutar_servicio_ari(configuracion: Configuracion) -> None:
                 configuracion.sonido_bienvenida,
                 whisper,
                 configuracion.ruta_cache_audio / "grabaciones",
+                ollama,
+                piper,
+                publicador,
             ),
             detener,
         )

@@ -6,7 +6,14 @@ import logging
 from pathlib import Path
 from uuid import uuid4
 
+from aplicacion.lenguaje.cliente_ollama import ClienteOllama, ErrorComprension
+from aplicacion.modelos.conversacion import SesionLlamada
 from aplicacion.reconocimiento_voz.servicio_whisper import ErrorWhisper, ServicioWhisper
+from aplicacion.sintesis_voz.publicador_asterisk import (
+    ErrorPublicacionAudio,
+    PublicadorAudioAsterisk,
+)
+from aplicacion.sintesis_voz.servicio_piper import ErrorPiper, ServicioPiper
 from aplicacion.telefonia.cliente_asterisk import ClienteAsterisk, ErrorAsterisk
 from aplicacion.telefonia.eventos_ari import ReceptorEventosAri
 from aplicacion.telefonia.eventos_llamada import EventoLlamada, TipoEvento
@@ -25,12 +32,18 @@ class OrquestadorAri:
         sonido_bienvenida: str | None = None,
         whisper: ServicioWhisper | None = None,
         ruta_grabaciones: Path = Path("datos/grabaciones"),
+        ollama: ClienteOllama | None = None,
+        piper: ServicioPiper | None = None,
+        publicador: PublicadorAudioAsterisk | None = None,
     ) -> None:
         self.cliente = cliente
         self.gestor = gestor
         self.sonido_bienvenida = sonido_bienvenida
         self.whisper = whisper
         self.ruta_grabaciones = ruta_grabaciones
+        self.ollama = ollama
+        self.piper = piper
+        self.publicador = publicador
 
     def procesar(self, evento: EventoLlamada) -> None:
         """Procesa un evento conocido con operaciones idempotentes.
@@ -84,6 +97,7 @@ class OrquestadorAri:
             self.cliente.descargar_grabacion(nombre, audio)
             transcripcion = self.whisper.transcribir(audio)
             sesion.ultimo_mensaje = transcripcion.texto
+            self._responder(sesion, transcripcion.texto)
             REGISTRO.info(
                 "Transcripción obtenida (%d caracteres)",
                 len(transcripcion.texto),
@@ -103,6 +117,32 @@ class OrquestadorAri:
                     "No fue posible eliminar la grabación procesada",
                     extra={"llamada": evento.identificador_canal},
                 )
+
+    def _responder(self, sesion: SesionLlamada, mensaje: str) -> None:
+        if not self.ollama or not self.piper or not self.publicador:
+            return
+        sistema = (
+            "Eres el asistente telefónico de Hotel Villa Margaritas. "
+            "Identifica la intención y responde en español, amable y brevemente. "
+            "No inventes disponibilidad, precios ni reservaciones. Devuelve el JSON solicitado."
+        )
+        try:
+            resultado = self.ollama.analizar(sistema, mensaje)
+            sesion.intencion = resultado.intencion
+            audio = self.piper.sintetizar(resultado.texto_respuesta[:500])
+            sonido = self.publicador.publicar(audio)
+            self.cliente.reproducir(sesion.identificador_llamada, sonido)
+            REGISTRO.info(
+                "Respuesta generada para intención %s",
+                resultado.intencion,
+                extra={"llamada": sesion.identificador_llamada},
+            )
+        except (ErrorComprension, ErrorPiper, ErrorPublicacionAudio, ErrorAsterisk):
+            sesion.errores.append("No fue posible generar la respuesta")
+            REGISTRO.exception(
+                "Falló la respuesta conversacional",
+                extra={"llamada": sesion.identificador_llamada},
+            )
 
     def finalizar_vencidas(self) -> int:
         """Cuelga y retira llamadas que excedieron el límite configurado."""

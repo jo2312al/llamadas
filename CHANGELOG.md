@@ -11,6 +11,7 @@
 - Receptor WebSocket ARI estable durante periodos sin llamadas.
 - Grabación ARI acotada, transcripción local con Whisper y eliminación inmediata
   del audio procesado sin registrar en disco el contenido hablado.
+- Clasificación estructurada con Ollama y respuesta telefónica generada con Piper.
 
 ## 0.3.0 - 2026-07-17
 
