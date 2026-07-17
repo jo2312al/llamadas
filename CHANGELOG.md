@@ -1,5 +1,13 @@
 # Registro de cambios
 
+## 0.4.0 - 2026-07-17
+
+- Instaladores fijados para whisper.cpp 1.8.6 y Piper 1.4.2.
+- Modelo Whisper small Q5_1 con SHA-256 verificada.
+- Voz Piper mexicana de alta calidad administrada fuera de Git.
+- Adaptador Piper actualizado a la CLI vigente.
+- Medición real Piper→Whisper en EC2 y transcripción española verificada.
+
 ## 0.3.0 - 2026-07-17
 
 - Cliente REST de Asterisk ARI con operaciones explícitamente permitidas.

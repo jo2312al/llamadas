@@ -72,6 +72,12 @@ local, coloque los binarios y modelos fuera de Git, ejecute `salud` y use WAV mo
 16 kHz. Los adaptadores rechazan archivos ausentes, salidas vacías y procesos que
 excedan el tiempo. Los modelos nunca se descargan durante las pruebas automatizadas.
 
+En EC2 (2 vCPU), Piper 1.4.2 con `es_MX-claude-high` sintetizó una frase de 5.6 s en
+1.49 s y utilizó aproximadamente 212 MiB RSS. whisper.cpp 1.8.6 con
+`small-q5_1` la transcribió correctamente en 14.93 s y utilizó aproximadamente
+461 MiB RSS. Esta latencia confirma que la primera versión debe procesar una llamada a
+la vez y segmentar intervenciones cortas.
+
 ## Asterisk y Ollama
 
 Mantenga ARI y Ollama en `127.0.0.1`; no publique sus puertos. Asterisk debe entregar

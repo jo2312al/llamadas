@@ -3,9 +3,9 @@ ruta_base_datos: datos/agente.db
 url_ollama: http://127.0.0.1:11434
 modelo_ollama: qwen2.5:3b-instruct-q4_K_M
 binario_whisper: /usr/local/bin/whisper-cli
-modelo_whisper: modelos/ggml-small-q5_1.bin
+modelo_whisper: /opt/agente-telefonico-hotel/modelos/ggml-small-q5_1.bin
 binario_piper: /usr/local/bin/piper
-modelo_piper: modelos/es_MX-claude-high.onnx
+modelo_piper: /opt/agente-telefonico-hotel/modelos/es_MX-claude-high.onnx
 ruta_cache_audio: datos/cache_audio
 umbral_voz_rms: 450
 espera_whisper_segundos: 25

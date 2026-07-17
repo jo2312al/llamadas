@@ -72,7 +72,7 @@ def test_piper_genera_y_reutiliza_cache(tmp_path: Path) -> None:
     servicio = ServicioPiper(binario, modelo, CacheAudio(tmp_path / "cache"))
 
     def simular(comando: list[str], **_: object) -> None:
-        destino = Path(comando[comando.index("--output_file") + 1])
+        destino = Path(comando[comando.index("--output-file") + 1])
         destino.write_bytes(b"R" * 45)
 
     with patch("subprocess.run", side_effect=simular) as proceso:

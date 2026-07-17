@@ -48,8 +48,15 @@ class ServicioPiper:
         temporal = destino.with_suffix(".temporal.wav")
         try:
             subprocess.run(
-                [str(self.binario), "--model", str(self.modelo), "--output_file", str(temporal)],
-                input=texto,
+                [
+                    str(self.binario),
+                    "--model",
+                    str(self.modelo),
+                    "--output-file",
+                    str(temporal),
+                    "--",
+                    texto,
+                ],
                 check=True,
                 capture_output=True,
                 text=True,
