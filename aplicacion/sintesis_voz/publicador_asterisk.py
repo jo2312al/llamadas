@@ -21,11 +21,11 @@ class PublicadorAudioAsterisk:
         if not nombre or not nombre.isalnum():
             raise ErrorPublicacionAudio("Nombre de audio no permitido")
         destino = self.directorio / f"{nombre}.wav"
-        destino.parent.mkdir(parents=True, exist_ok=True)
-        if destino.is_file() and destino.stat().st_size > 44:
-            return f"{self.prefijo}/{nombre}"
         temporal = destino.with_suffix(".temporal.wav")
         try:
+            destino.parent.mkdir(parents=True, exist_ok=True)
+            if destino.is_file() and destino.stat().st_size > 44:
+                return f"{self.prefijo}/{nombre}"
             subprocess.run(
                 [
                     "sox",

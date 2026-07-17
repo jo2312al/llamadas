@@ -15,6 +15,7 @@
 - Tiempo de carga inicial de Ollama adaptado a CPU y modelo caliente durante 30 minutos.
 - Margen de Whisper ajustado para la contención de CPU durante llamadas concurrentes.
 - Clasificador local seguro para mantener el servicio operativo cuando Ollama está desactivado.
+- Publicador telefónico con acceso mínimo mediante el grupo local de Asterisk.
 
 ## 0.3.0 - 2026-07-17
 
