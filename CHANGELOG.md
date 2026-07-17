@@ -9,6 +9,8 @@
 - Medición real Piper→Whisper en EC2 y transcripción española verificada.
 - Bienvenida Piper convertida a WAV mono telefónico de 8 kHz y reproducción desde ARI.
 - Receptor WebSocket ARI estable durante periodos sin llamadas.
+- Grabación ARI acotada, transcripción local con Whisper y eliminación inmediata
+  del audio procesado sin registrar en disco el contenido hablado.
 
 ## 0.3.0 - 2026-07-17
 

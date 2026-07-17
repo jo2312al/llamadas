@@ -83,4 +83,5 @@ def test_fin_de_grabacion_transcribe_y_actualiza_sesion(tmp_path) -> None:
     )
     orquestador.procesar(terminado)
     cliente.descargar_grabacion.assert_called_once_with("hotel-abc", tmp_path / "hotel-abc.wav")
+    cliente.eliminar_grabacion.assert_called_once_with("hotel-abc")
     assert gestor.obtener("canal-1").ultimo_mensaje == "Quiero reservar una habitación"

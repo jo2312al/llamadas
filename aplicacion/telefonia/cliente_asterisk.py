@@ -86,6 +86,11 @@ class ClienteAsterisk:
         destino.write_bytes(respuesta.content)
         return destino
 
+    def eliminar_grabacion(self, nombre: str) -> None:
+        """Elimina de Asterisk una grabación que ya fue procesada."""
+        self._validar_nombre_grabacion(nombre)
+        self._solicitar("DELETE", f"recordings/stored/{quote(nombre, safe='')}")
+
     @staticmethod
     def _validar_nombre_grabacion(nombre: str) -> None:
         if not nombre or not nombre.replace("-", "").isalnum():

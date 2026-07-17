@@ -89,14 +89,17 @@ def test_interpreta_eventos_de_reproduccion_y_grabacion() -> None:
     assert grabacion.identificador_recurso == "hotel-abc"
 
 
-def test_graba_y_descarga_audio_por_ari(tmp_path) -> None:
-    cliente, solicitudes = crear_cliente([201, 200])
+def test_graba_descarga_y_elimina_audio_por_ari(tmp_path) -> None:
+    cliente, solicitudes = crear_cliente([201, 200, 204])
     cliente.grabar("canal/1", "hotel-abc", duracion_maxima=10, silencio_maximo=2)
     destino = cliente.descargar_grabacion("hotel-abc", tmp_path / "audio.wav")
+    cliente.eliminar_grabacion("hotel-abc")
     cliente.cerrar()
     assert solicitudes[0].url.path.endswith("channels/canal/1/record")
     assert solicitudes[0].url.params["format"] == "wav"
     assert solicitudes[1].url.raw_path.endswith(b"recordings/stored/hotel-abc/file")
+    assert solicitudes[2].method == "DELETE"
+    assert solicitudes[2].url.path.endswith("recordings/stored/hotel-abc")
     assert destino.is_file()
 
 

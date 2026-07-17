@@ -85,8 +85,8 @@ class OrquestadorAri:
             transcripcion = self.whisper.transcribir(audio)
             sesion.ultimo_mensaje = transcripcion.texto
             REGISTRO.info(
-                "Transcripción obtenida: %s",
-                transcripcion.texto,
+                "Transcripción obtenida (%d caracteres)",
+                len(transcripcion.texto),
                 extra={"llamada": evento.identificador_canal},
             )
         except (ErrorAsterisk, ErrorWhisper, OSError):
@@ -96,6 +96,13 @@ class OrquestadorAri:
             )
         finally:
             audio.unlink(missing_ok=True)
+            try:
+                self.cliente.eliminar_grabacion(nombre)
+            except ErrorAsterisk:
+                REGISTRO.warning(
+                    "No fue posible eliminar la grabación procesada",
+                    extra={"llamada": evento.identificador_canal},
+                )
 
     def finalizar_vencidas(self) -> int:
         """Cuelga y retira llamadas que excedieron el límite configurado."""
