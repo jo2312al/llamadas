@@ -1,0 +1,47 @@
+name: Validar y desplegar
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements-dev.txt
+      - run: ruff check .
+      - run: black --check .
+      - run: python -m compileall -q aplicacion pruebas
+      - run: python -c "import pathlib,yaml; [yaml.safe_load(p.read_text()) for p in pathlib.Path('.').rglob('*.y*ml')]"
+      - run: python -m pytest
+
+  desplegar:
+    needs: validar
+    runs-on: ubuntu-latest
+    environment: produccion
+    steps:
+      - uses: actions/checkout@v4
+      - name: Preparar SSH
+        env:
+          CLAVE: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+          HOST: ${{ secrets.EC2_HOST }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$CLAVE" > ~/.ssh/id_ec2
+          chmod 600 ~/.ssh/id_ec2
+          ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts
+      - name: Desplegar revisión validada
+        env:
+          HOST: ${{ secrets.EC2_HOST }}
+          USUARIO: ${{ secrets.EC2_USER }}
+          RUTA: ${{ secrets.EC2_RUTA_PROYECTO }}
+          REVISION: ${{ github.sha }}
+        run: ssh -i ~/.ssh/id_ec2 "$USUARIO@$HOST" "cd '$RUTA' && REVISION_DESPLIEGUE='$REVISION' EC2_RUTA_PROYECTO='$RUTA' ./scripts/desplegar.sh"

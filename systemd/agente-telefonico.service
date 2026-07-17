@@ -1,0 +1,25 @@
+[Unit]
+Description=Agente telefónico de Hotel Villa Margaritas
+After=network-online.target asterisk.service ollama.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=agente-hotel
+Group=agente-hotel
+WorkingDirectory=/opt/agente-telefonico-hotel
+EnvironmentFile=-/etc/agente-telefonico/agente-telefonico.env
+ExecStart=/opt/agente-telefonico-hotel/.venv/bin/python -m aplicacion.principal conversar --configuracion configuracion/configuracion.yaml
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/opt/agente-telefonico-hotel/datos /opt/agente-telefonico-hotel/registros /opt/agente-telefonico-hotel/respaldos
+LimitNOFILE=4096
+MemoryMax=1500M
+
+[Install]
+WantedBy=multi-user.target
+
