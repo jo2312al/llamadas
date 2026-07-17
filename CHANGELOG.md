@@ -9,6 +9,7 @@
 - Pruebas ARI simuladas sin llamadas ni puertos públicos.
 - Instalador reproducible de Asterisk 22.10.1 con SHA-256 fijada.
 - Plantillas ARI limitadas a localhost y dialplan de laboratorio.
+- Espera acotada de disponibilidad ARI después de reiniciar Asterisk.
 
 ## 0.2.0 - 2026-07-17
 

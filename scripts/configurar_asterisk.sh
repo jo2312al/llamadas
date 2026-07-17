@@ -26,6 +26,17 @@ sudo install -m 0640 -o asterisk -g asterisk "${temporal}" "${DESTINO}/ari.conf"
 sudo systemctl enable asterisk.service
 sudo systemctl restart asterisk.service
 sudo systemctl is-active --quiet asterisk.service
-curl --fail --silent --show-error --user "agente-hotel:${ASTERISK_ARI_PASSWORD}" \
-  http://127.0.0.1:8088/ari/asterisk/info >/dev/null
+ari_disponible=false
+for _intento in $(seq 1 15); do
+  if curl --fail --silent --user "agente-hotel:${ASTERISK_ARI_PASSWORD}" \
+    http://127.0.0.1:8088/ari/asterisk/info >/dev/null; then
+    ari_disponible=true
+    break
+  fi
+  sudo systemctl is-active --quiet asterisk.service || break
+  sleep 1
+done
+[[ "${ari_disponible}" == true ]] || {
+  echo "Asterisk inició, pero ARI no respondió con las credenciales configuradas."; exit 4;
+}
 echo "Asterisk y ARI configurados correctamente en localhost."
