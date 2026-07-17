@@ -3,6 +3,8 @@ ruta_base_datos: datos/agente.db
 url_ollama: http://127.0.0.1:11434
 modelo_ollama: qwen2.5:3b-instruct-q4_K_M
 espera_ollama_segundos: 60
+# url_api_reservas: https://reservas.ejemplo.com/api/solicitudes
+espera_api_reservas_segundos: 10
 binario_whisper: /usr/local/bin/whisper-cli
 modelo_whisper: /opt/agente-telefonico-hotel/modelos/ggml-small-q5_1.bin
 binario_piper: /usr/local/bin/piper

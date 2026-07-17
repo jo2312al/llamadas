@@ -56,3 +56,56 @@ def test_repregunta_fecha_invalida_y_reporta_sin_cupo(tmp_path: Path) -> None:
     flujo.procesar(sesion, "suite")
     respuesta = flujo.procesar(sesion, "2")[1]
     assert respuesta == "No hay habitaciones suite disponibles en esas fechas."
+
+
+def test_confirma_contacto_guarda_y_bloquea_inventario(tmp_path: Path) -> None:
+    flujo, disponibilidad = crear_flujo(tmp_path)
+    sesion = SesionLlamada(identificador_llamada="llamada-3")
+    for mensaje in (
+        "Quiero reservar",
+        "10 de agosto de 2027",
+        "12 de agosto de 2027",
+        "king",
+        "dos adultos",
+    ):
+        flujo.procesar(sesion, mensaje)
+
+    assert "nombre" in flujo.procesar(sesion, "sí, continuar")[1]
+    assert "teléfono" in flujo.procesar(sesion, "Ana Pérez López")[1]
+    assert "Autoriza" in flujo.procesar(sesion, "5512345678")[1]
+    respuesta = flujo.procesar(sesion, "sí autorizo")[1]
+
+    assert "registrada correctamente" in respuesta
+    assert sesion.estado_actual == EstadoConversacion.FINALIZAR
+    assert sesion.identificador_solicitud is not None
+    assert (
+        disponibilidad.conexion.execute("SELECT count(*) FROM solicitudes_reservacion").fetchone()[
+            0
+        ]
+        == 1
+    )
+    assert disponibilidad.consultar(date(2027, 8, 10), date(2027, 8, 12))[1].disponibles == 4
+
+
+def test_no_envia_ni_bloquea_sin_consentimiento(tmp_path: Path) -> None:
+    flujo, disponibilidad = crear_flujo(tmp_path)
+    sesion = SesionLlamada(identificador_llamada="llamada-4")
+    for mensaje in (
+        "Quiero reservar",
+        "10 de agosto de 2027",
+        "12 de agosto de 2027",
+        "suite",
+        "2",
+        "sí",
+        "Luis Hernández Soto",
+        "5512345678",
+    ):
+        flujo.procesar(sesion, mensaje)
+    respuesta = flujo.procesar(sesion, "no")[1]
+    assert "no enviaré sus datos" in respuesta
+    assert (
+        disponibilidad.conexion.execute("SELECT count(*) FROM solicitudes_reservacion").fetchone()[
+            0
+        ]
+        == 0
+    )

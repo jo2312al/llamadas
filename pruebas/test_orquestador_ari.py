@@ -6,6 +6,7 @@ from unittest.mock import Mock
 import pytest
 
 from aplicacion.lenguaje.esquemas_ollama import RespuestaOllama
+from aplicacion.modelos.conversacion import EstadoConversacion
 from aplicacion.reconocimiento_voz.servicio_whisper import Transcripcion
 from aplicacion.telefonia.cliente_asterisk import ErrorAsterisk
 from aplicacion.telefonia.eventos_llamada import EventoLlamada, TipoEvento
@@ -141,3 +142,14 @@ def test_canal_cerrado_al_reanudar_escucha_no_detiene_servicio() -> None:
         evento(TipoEvento.REPRODUCCION_TERMINADA)
     )
     assert gestor.obtener("canal-1") is not None
+
+
+def test_cuelga_despues_de_reproducir_respuesta_final() -> None:
+    cliente = Mock()
+    gestor = GestorSesiones()
+    sesion = gestor.crear("canal-1")
+    sesion.estado_actual = EstadoConversacion.FINALIZAR
+    OrquestadorAri(cliente, gestor, whisper=Mock()).procesar(
+        evento(TipoEvento.REPRODUCCION_TERMINADA)
+    )
+    cliente.colgar.assert_called_once_with("canal-1")

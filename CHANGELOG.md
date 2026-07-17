@@ -22,6 +22,8 @@
 - Migraciones de producción ejecutadas con el usuario propietario de SQLite.
 - Diálogo telefónico por turnos para entrada, salida, categoría y adultos,
   conectado a la disponibilidad real antes de presentar cupo.
+- Confirmación, contacto y consentimiento antes de bloquear inventario, persistir
+  la solicitud y enviarla por API con clave de idempotencia.
 
 ## 0.3.0 - 2026-07-17
 

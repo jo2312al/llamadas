@@ -4,9 +4,12 @@ import re
 import unicodedata
 from datetime import date
 
+from aplicacion.base_datos.repositorio_reservaciones import guardar_solicitud
 from aplicacion.conversacion.maquina_estados import transicionar
 from aplicacion.disponibilidad.servicio import ServicioDisponibilidad, normalizar_tipo
+from aplicacion.integraciones.api_reservas import ClienteApiReservas, ErrorApiReservas
 from aplicacion.modelos.conversacion import EstadoConversacion, SesionLlamada
+from aplicacion.modelos.reservacion import SolicitudReservacion
 
 MESES = {
     "enero": 1,
@@ -41,8 +44,13 @@ NUMEROS = {
 class FlujoReservacion:
     """Solicita un dato por turno y consulta inventario autorizado."""
 
-    def __init__(self, disponibilidad: ServicioDisponibilidad) -> None:
+    def __init__(
+        self,
+        disponibilidad: ServicioDisponibilidad,
+        api_reservas: ClienteApiReservas | None = None,
+    ) -> None:
         self.disponibilidad = disponibilidad
+        self.api_reservas = api_reservas
 
     def procesar(self, sesion: SesionLlamada, mensaje: str) -> tuple[str, str]:
         """Actualiza la sesión y devuelve intención y siguiente pregunta."""
@@ -59,6 +67,15 @@ class FlujoReservacion:
             return clasificar_intencion(mensaje)
 
         datos = sesion.datos
+        if sesion.estado_actual == EstadoConversacion.PRESENTAR_OPCIONES:
+            if not es_afirmativo(mensaje):
+                return "reservacion", "De acuerdo. ¿Desea cambiar fechas o tipo de habitación?"
+            transicionar(sesion, EstadoConversacion.CONFIRMAR_DATOS)
+            return "reservacion", "Para registrar la solicitud, dígame su nombre completo."
+
+        if sesion.estado_actual == EstadoConversacion.CONFIRMAR_DATOS:
+            return "reservacion", self._recopilar_contacto(sesion, mensaje)
+
         if datos.fecha_entrada is None:
             entrada = extraer_fecha(mensaje)
             if entrada is None:
@@ -89,6 +106,78 @@ class FlujoReservacion:
             return "reservacion", self._consultar_y_responder(sesion)
 
         return "reservacion", self._consultar_y_responder(sesion)
+
+    def _recopilar_contacto(self, sesion: SesionLlamada, mensaje: str) -> str:
+        datos = sesion.datos
+        if datos.nombre_completo is None:
+            nombre = " ".join(mensaje.strip().split())
+            if len(nombre) < 5 or any(caracter.isdigit() for caracter in nombre):
+                return "Dígame su nombre y apellidos, por favor."
+            datos.nombre_completo = nombre[:120]
+            return "¿Cuál es su número de teléfono?"
+        if datos.telefono is None:
+            telefono = "".join(re.findall(r"\d", mensaje))
+            if not 10 <= len(telefono) <= 15:
+                return "Indique un teléfono de entre diez y quince dígitos."
+            datos.telefono = telefono
+            return "¿Autoriza que el hotel le contacte para dar seguimiento a esta solicitud?"
+        if datos.consentimiento_contacto is None:
+            if es_negativo(mensaje):
+                datos.consentimiento_contacto = False
+                return "Sin su autorización no enviaré sus datos. ¿Desea comunicarse con recepción?"
+            if not es_afirmativo(mensaje):
+                return "Responda sí o no para autorizar el contacto."
+            datos.consentimiento_contacto = True
+            try:
+                return self._registrar_y_enviar(sesion)
+            except ValueError:
+                datos.consentimiento_contacto = None
+                return (
+                    "La disponibilidad cambió antes de registrar. "
+                    "Recepción revisará otras opciones."
+                )
+        return "Su solicitud ya fue registrada."
+
+    def _registrar_y_enviar(self, sesion: SesionLlamada) -> str:
+        entrada = sesion.datos.fecha_entrada
+        salida = sesion.datos.fecha_salida
+        tipo = sesion.datos.tipo_habitacion
+        if not entrada or not salida or not tipo:
+            raise ValueError("Faltan datos para bloquear inventario")
+        solicitud = SolicitudReservacion(
+            identificador_llamada=sesion.identificador_llamada,
+            datos=sesion.datos,
+            resumen_conversacion="Solicitud recopilada por agente telefónico.",
+            nivel_confianza=1,
+        )
+        self.disponibilidad.bloquear(
+            tipo,
+            entrada,
+            salida,
+            sesion.datos.numero_habitaciones,
+            solicitud.identificador_solicitud,
+        )
+        transicionar(sesion, EstadoConversacion.GUARDAR_SOLICITUD)
+        guardar_solicitud(self.disponibilidad.conexion, solicitud)
+        sesion.identificador_solicitud = solicitud.identificador_solicitud
+        transicionar(sesion, EstadoConversacion.ENVIAR_NOTIFICACION)
+        if self.api_reservas:
+            try:
+                self.api_reservas.enviar(solicitud)
+            except ErrorApiReservas:
+                sesion.requiere_revision = True
+                sesion.motivo_revision = "Entrega pendiente a API de reservas"
+                self.disponibilidad.conexion.execute(
+                    """UPDATE solicitudes_reservacion
+                       SET requiere_revision = 1, motivo_revision = ?
+                       WHERE identificador_solicitud = ?""",
+                    (sesion.motivo_revision, solicitud.identificador_solicitud),
+                )
+                self.disponibilidad.conexion.commit()
+        transicionar(sesion, EstadoConversacion.FINALIZAR)
+        if sesion.requiere_revision:
+            return "Su solicitud quedó registrada y será revisada por recepción."
+        return "Su solicitud fue registrada correctamente. El hotel le contactará para confirmarla."
 
     def _consultar_y_responder(self, sesion: SesionLlamada) -> str:
         datos = sesion.datos
@@ -157,6 +246,16 @@ def extraer_numero(mensaje: str) -> int | None:
         return int(coincidencia.group(1))
     palabras = set(re.findall(r"\w+", quitar_acentos(mensaje.casefold())))
     return next((valor for palabra, valor in NUMEROS.items() if palabra in palabras), None)
+
+
+def es_afirmativo(mensaje: str) -> bool:
+    palabras = set(re.findall(r"\w+", quitar_acentos(mensaje.casefold())))
+    return bool(palabras.intersection({"si", "confirmo", "continuar", "adelante"}))
+
+
+def es_negativo(mensaje: str) -> bool:
+    palabras = set(re.findall(r"\w+", quitar_acentos(mensaje.casefold())))
+    return bool(palabras.intersection({"no", "negativo"}))
 
 
 def quitar_acentos(texto: str) -> str:

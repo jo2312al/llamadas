@@ -15,6 +15,9 @@ class Configuracion(BaseModel):
     url_ollama: str = "http://127.0.0.1:11434"
     modelo_ollama: str = "qwen2.5:3b-instruct-q4_K_M"
     espera_ollama_segundos: float = Field(default=60, gt=0, le=180)
+    url_api_reservas: str | None = None
+    token_api_reservas: SecretStr | None = None
+    espera_api_reservas_segundos: float = Field(default=10, gt=0, le=60)
     binario_whisper: Path = Path("/usr/local/bin/whisper-cli")
     modelo_whisper: Path = Path("modelos/ggml-small-q5_1.bin")
     binario_piper: Path = Path("/usr/local/bin/piper")
@@ -41,6 +44,10 @@ def cargar_configuracion(ruta: Path) -> Configuracion:
         contenido["ruta_base_datos"] = valor
     if valor := os.getenv("AGENTE_URL_OLLAMA"):
         contenido["url_ollama"] = valor
+    if valor := os.getenv("AGENTE_RESERVAS_API_URL"):
+        contenido["url_api_reservas"] = valor
+    if valor := os.getenv("AGENTE_RESERVAS_API_TOKEN"):
+        contenido["token_api_reservas"] = valor
     if valor := os.getenv("AGENTE_ARI_USUARIO"):
         contenido["usuario_ari"] = valor
     if valor := os.getenv("AGENTE_ARI_PASSWORD"):

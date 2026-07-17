@@ -15,6 +15,7 @@ from aplicacion.base_datos.conexion import conectar, migrar
 from aplicacion.configuracion import Configuracion, cargar_configuracion
 from aplicacion.conversacion.flujo_reservacion import FlujoReservacion
 from aplicacion.disponibilidad.servicio import ServicioDisponibilidad
+from aplicacion.integraciones.api_reservas import ClienteApiReservas
 from aplicacion.lenguaje.cliente_ollama import ClienteOllama
 from aplicacion.reconocimiento_voz.servicio_whisper import ServicioWhisper
 from aplicacion.sintesis_voz.cache_audio import CacheAudio
@@ -104,7 +105,21 @@ async def _ejecutar_servicio_ari(configuracion: Configuracion) -> None:
     )
     publicador = PublicadorAudioAsterisk(Path("/var/lib/asterisk/sounds/hotel/generado"))
     conexion_disponibilidad = conectar(configuracion.ruta_base_datos)
-    flujo_reservacion = FlujoReservacion(ServicioDisponibilidad(conexion_disponibilidad))
+    api_reservas = None
+    if configuracion.url_api_reservas:
+        token = (
+            configuracion.token_api_reservas.get_secret_value()
+            if configuracion.token_api_reservas
+            else None
+        )
+        api_reservas = ClienteApiReservas(
+            configuracion.url_api_reservas,
+            token,
+            configuracion.espera_api_reservas_segundos,
+        )
+    flujo_reservacion = FlujoReservacion(
+        ServicioDisponibilidad(conexion_disponibilidad), api_reservas
+    )
     detener = asyncio.Event()
     bucle = asyncio.get_running_loop()
     for senal in (signal.SIGTERM, signal.SIGINT):
@@ -129,6 +144,8 @@ async def _ejecutar_servicio_ari(configuracion: Configuracion) -> None:
         )
     finally:
         cliente.cerrar()
+        if api_reservas:
+            api_reservas.cerrar()
         conexion_disponibilidad.close()
         print("Servicio ARI del agente telefónico detenido", flush=True)
 

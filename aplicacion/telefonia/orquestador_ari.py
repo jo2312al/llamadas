@@ -8,7 +8,7 @@ from uuid import uuid4
 
 from aplicacion.conversacion.flujo_reservacion import FlujoReservacion, clasificar_intencion
 from aplicacion.lenguaje.cliente_ollama import ClienteOllama, ErrorComprension
-from aplicacion.modelos.conversacion import SesionLlamada
+from aplicacion.modelos.conversacion import EstadoConversacion, SesionLlamada
 from aplicacion.reconocimiento_voz.servicio_whisper import ErrorWhisper, ServicioWhisper
 from aplicacion.sintesis_voz.publicador_asterisk import (
     ErrorPublicacionAudio,
@@ -80,7 +80,13 @@ class OrquestadorAri:
             if self.gestor.finalizar(canal):
                 REGISTRO.info("Sesión de llamada finalizada", extra={"llamada": canal})
         elif evento.tipo == TipoEvento.REPRODUCCION_TERMINADA and self.whisper:
-            if self.gestor.obtener(canal):
+            sesion = self.gestor.obtener(canal)
+            if sesion and sesion.estado_actual == EstadoConversacion.FINALIZAR:
+                try:
+                    self.cliente.colgar(canal)
+                except ErrorAsterisk:
+                    REGISTRO.info("El canal ya estaba finalizado", extra={"llamada": canal})
+            elif sesion:
                 try:
                     self._iniciar_grabacion(canal)
                 except ErrorAsterisk:
