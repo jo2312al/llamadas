@@ -44,4 +44,16 @@ jobs:
           USUARIO: ${{ secrets.EC2_USER }}
           RUTA: ${{ secrets.EC2_RUTA_PROYECTO }}
           REVISION: ${{ github.sha }}
-        run: ssh -i ~/.ssh/id_ec2 "$USUARIO@$HOST" "cd '$RUTA' && REVISION_DESPLIEGUE='$REVISION' EC2_RUTA_PROYECTO='$RUTA' ./scripts/desplegar.sh"
+        run: |
+          ssh -i ~/.ssh/id_ec2 "$USUARIO@$HOST" bash -s -- "$RUTA" "$REVISION" <<'REMOTO'
+          set -Eeuo pipefail
+          ruta="$1"
+          revision="$2"
+          temporal="/tmp/agente-desplegar-${revision}.sh"
+          trap 'rm -f "$temporal"' EXIT
+          cd "$ruta"
+          git fetch --prune origin
+          git show "${revision}:scripts/desplegar.sh" >"$temporal"
+          chmod 0700 "$temporal"
+          REVISION_DESPLIEGUE="$revision" EC2_RUTA_PROYECTO="$ruta" "$temporal"
+          REMOTO

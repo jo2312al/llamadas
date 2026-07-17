@@ -8,6 +8,7 @@
 - Caché de síntesis determinística y pruebas sin modelos reales.
 - Diagnóstico de binarios y modelos configurados.
 - Modo no interactivo supervisable por systemd y apagado mediante señales.
+- El workflow ejecuta el script de despliegue perteneciente a la revisión validada.
 
 ## 0.1.0 - 2026-07-17
 
