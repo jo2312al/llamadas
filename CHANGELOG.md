@@ -19,6 +19,7 @@
 - Eventos tardíos de reproducción tolerados cuando el canal ya fue colgado.
 - Inventario transaccional establecido: 15 dobles, 5 king y 5 suites, con
   bloqueos por rango, liberación idempotente y prevención de sobreventa.
+- Migraciones de producción ejecutadas con el usuario propietario de SQLite.
 
 ## 0.3.0 - 2026-07-17
 
