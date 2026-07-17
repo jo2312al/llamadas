@@ -23,6 +23,16 @@ temporal="$(mktemp)"
 trap 'rm -f "${temporal}"' EXIT
 sed "s|__ARI_PASSWORD__|${ASTERISK_ARI_PASSWORD}|g" "${RUTA_PROYECTO}/asterisk/ari.conf.plantilla" >"${temporal}"
 sudo install -m 0640 -o asterisk -g asterisk "${temporal}" "${DESTINO}/ari.conf"
+entorno_temporal="$(mktemp)"
+trap 'rm -f "${temporal}" "${entorno_temporal}"' EXIT
+archivo_entorno="/etc/agente-telefonico/agente-telefonico.env"
+sudo install -d -m 0750 /etc/agente-telefonico
+if sudo test -f "${archivo_entorno}"; then
+  sudo grep -Ev '^AGENTE_ARI_(USUARIO|PASSWORD)=' "${archivo_entorno}" >"${entorno_temporal}" || true
+fi
+printf 'AGENTE_ARI_USUARIO=agente-hotel\nAGENTE_ARI_PASSWORD=%s\n' \
+  "${ASTERISK_ARI_PASSWORD}" >>"${entorno_temporal}"
+sudo install -m 0640 -o root -g agente-hotel "${entorno_temporal}" "${archivo_entorno}"
 sudo systemctl enable asterisk.service
 sudo systemctl restart asterisk.service
 sudo systemctl is-active --quiet asterisk.service

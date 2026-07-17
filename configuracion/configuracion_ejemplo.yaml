@@ -11,6 +11,7 @@ umbral_voz_rms: 450
 espera_whisper_segundos: 25
 espera_piper_segundos: 15
 url_ari: http://127.0.0.1:8088
+usuario_ari: agente-hotel
 aplicacion_ari: agente-hotel
 extension_recepcion: recepcion-101
 duracion_maxima_llamada_segundos: 900

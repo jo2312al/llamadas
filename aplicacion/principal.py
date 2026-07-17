@@ -10,6 +10,7 @@ from pathlib import Path
 
 from aplicacion.base_datos.conexion import conectar, migrar
 from aplicacion.configuracion import cargar_configuracion
+from aplicacion.telefonia.cliente_asterisk import ClienteAsterisk, ErrorAsterisk
 
 
 def ejecutar_servicio(ruta_configuracion: Path) -> None:
@@ -65,11 +66,29 @@ def verificar_salud(ruta_configuracion: Path) -> int:
     }
     for nombre, ruta in componentes.items():
         resultados[nombre] = "disponible" if ruta.is_file() else "no instalado"
+    if configuracion.contrasena_ari:
+        cliente_asterisk = ClienteAsterisk(
+            configuracion.url_ari,
+            configuracion.usuario_ari,
+            configuracion.contrasena_ari.get_secret_value(),
+        )
+        try:
+            cliente_asterisk.comprobar()
+            resultados["asterisk_ari"] = "correcto"
+        except ErrorAsterisk as error:
+            resultados["asterisk_ari"] = f"error: {error}"
+        finally:
+            cliente_asterisk.cerrar()
+    else:
+        resultados["asterisk_ari"] = "credencial no configurada"
     libre = shutil.disk_usage(configuracion.ruta_base_datos.parent).free // (1024 * 1024)
     resultados["disco_libre_mib"] = str(libre)
     for clave, valor in resultados.items():
         print(f"{clave}: {valor}")
-    return 0 if resultados["base_datos"] == "correcta" else 1
+    servicios_correctos = resultados["base_datos"] == "correcta" and not resultados.get(
+        "asterisk_ari", ""
+    ).startswith("error")
+    return 0 if servicios_correctos else 1
 
 
 def main() -> None:

@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 
 import yaml
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, SecretStr
 
 
 class Configuracion(BaseModel):
@@ -23,6 +23,8 @@ class Configuracion(BaseModel):
     espera_whisper_segundos: float = Field(default=25, gt=0, le=120)
     espera_piper_segundos: float = Field(default=15, gt=0, le=60)
     url_ari: str = "http://127.0.0.1:8088"
+    usuario_ari: str = "agente-hotel"
+    contrasena_ari: SecretStr | None = None
     aplicacion_ari: str = "agente-hotel"
     extension_recepcion: str = "recepcion-101"
     duracion_maxima_llamada_segundos: int = Field(default=900, ge=30, le=3600)
@@ -37,4 +39,8 @@ def cargar_configuracion(ruta: Path) -> Configuracion:
         contenido["ruta_base_datos"] = valor
     if valor := os.getenv("AGENTE_URL_OLLAMA"):
         contenido["url_ollama"] = valor
+    if valor := os.getenv("AGENTE_ARI_USUARIO"):
+        contenido["usuario_ari"] = valor
+    if valor := os.getenv("AGENTE_ARI_PASSWORD"):
+        contenido["contrasena_ari"] = valor
     return Configuracion.model_validate(contenido)
