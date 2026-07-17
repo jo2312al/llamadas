@@ -32,10 +32,9 @@ git checkout --detach "${REVISION}"
 python3.11 -m venv .venv
 .venv/bin/pip install --disable-pip-version-check -r requirements.txt
 .venv/bin/python -m aplicacion.principal migrar --configuracion configuracion/configuracion.yaml
-install -d -m 0750 datos registros respaldos
+sudo install -d -o agente-hotel -g agente-hotel -m 0770 datos registros respaldos
 sudo systemctl restart agente-telefonico.service
 sudo systemctl is-active --quiet agente-telefonico.service
 .venv/bin/python -m aplicacion.principal salud --configuracion configuracion/configuracion.yaml
 registrar "Revisión desplegada: $(git rev-parse HEAD)"
 trap - ERR
-

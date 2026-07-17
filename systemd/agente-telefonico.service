@@ -9,7 +9,7 @@ User=agente-hotel
 Group=agente-hotel
 WorkingDirectory=/opt/agente-telefonico-hotel
 EnvironmentFile=-/etc/agente-telefonico/agente-telefonico.env
-ExecStart=/opt/agente-telefonico-hotel/.venv/bin/python -m aplicacion.principal conversar --configuracion configuracion/configuracion.yaml
+ExecStart=/opt/agente-telefonico-hotel/.venv/bin/python -m aplicacion.principal servir --configuracion configuracion/configuracion.yaml
 Restart=on-failure
 RestartSec=5
 NoNewPrivileges=true
@@ -22,4 +22,3 @@ MemoryMax=1500M
 
 [Install]
 WantedBy=multi-user.target
-
