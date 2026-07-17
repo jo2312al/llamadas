@@ -17,6 +17,8 @@
 - Clasificador local seguro para mantener el servicio operativo cuando Ollama está desactivado.
 - Publicador telefónico con acceso mínimo mediante el grupo local de Asterisk.
 - Eventos tardíos de reproducción tolerados cuando el canal ya fue colgado.
+- Inventario transaccional establecido: 15 dobles, 5 king y 5 suites, con
+  bloqueos por rango, liberación idempotente y prevención de sobreventa.
 
 ## 0.3.0 - 2026-07-17
 

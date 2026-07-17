@@ -1,0 +1,1 @@
+"""Inventario determinístico del hotel."""
