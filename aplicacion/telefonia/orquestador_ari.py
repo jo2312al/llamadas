@@ -3,7 +3,10 @@
 import asyncio
 import contextlib
 import logging
+from pathlib import Path
+from uuid import uuid4
 
+from aplicacion.reconocimiento_voz.servicio_whisper import ErrorWhisper, ServicioWhisper
 from aplicacion.telefonia.cliente_asterisk import ClienteAsterisk, ErrorAsterisk
 from aplicacion.telefonia.eventos_ari import ReceptorEventosAri
 from aplicacion.telefonia.eventos_llamada import EventoLlamada, TipoEvento
@@ -20,10 +23,14 @@ class OrquestadorAri:
         cliente: ClienteAsterisk,
         gestor: GestorSesiones,
         sonido_bienvenida: str | None = None,
+        whisper: ServicioWhisper | None = None,
+        ruta_grabaciones: Path = Path("datos/grabaciones"),
     ) -> None:
         self.cliente = cliente
         self.gestor = gestor
         self.sonido_bienvenida = sonido_bienvenida
+        self.whisper = whisper
+        self.ruta_grabaciones = ruta_grabaciones
 
     def procesar(self, evento: EventoLlamada) -> None:
         """Procesa un evento conocido con operaciones idempotentes.
@@ -47,6 +54,8 @@ class OrquestadorAri:
                 self.cliente.responder(canal)
                 if self.sonido_bienvenida:
                     self.cliente.reproducir(canal, self.sonido_bienvenida)
+                elif self.whisper:
+                    self._iniciar_grabacion(canal)
             except ErrorAsterisk:
                 self.gestor.finalizar(canal)
                 raise
@@ -54,6 +63,39 @@ class OrquestadorAri:
         elif evento.tipo == TipoEvento.FIN:
             if self.gestor.finalizar(canal):
                 REGISTRO.info("Sesión de llamada finalizada", extra={"llamada": canal})
+        elif evento.tipo == TipoEvento.REPRODUCCION_TERMINADA and self.whisper:
+            if self.gestor.obtener(canal):
+                self._iniciar_grabacion(canal)
+        elif evento.tipo == TipoEvento.GRABACION_TERMINADA and self.whisper:
+            self._transcribir(evento)
+
+    def _iniciar_grabacion(self, canal: str) -> None:
+        nombre = f"hotel-{uuid4().hex}"
+        self.cliente.grabar(canal, nombre)
+        REGISTRO.info("Escucha iniciada", extra={"llamada": canal})
+
+    def _transcribir(self, evento: EventoLlamada) -> None:
+        sesion = self.gestor.obtener(evento.identificador_canal)
+        nombre = evento.identificador_recurso
+        if sesion is None or not nombre or self.whisper is None:
+            return
+        audio = self.ruta_grabaciones / f"{nombre}.wav"
+        try:
+            self.cliente.descargar_grabacion(nombre, audio)
+            transcripcion = self.whisper.transcribir(audio)
+            sesion.ultimo_mensaje = transcripcion.texto
+            REGISTRO.info(
+                "Transcripción obtenida: %s",
+                transcripcion.texto,
+                extra={"llamada": evento.identificador_canal},
+            )
+        except (ErrorAsterisk, ErrorWhisper, OSError):
+            sesion.errores.append("No fue posible transcribir la intervención")
+            REGISTRO.exception(
+                "Falló la transcripción", extra={"llamada": evento.identificador_canal}
+            )
+        finally:
+            audio.unlink(missing_ok=True)
 
     def finalizar_vencidas(self) -> int:
         """Cuelga y retira llamadas que excedieron el límite configurado."""

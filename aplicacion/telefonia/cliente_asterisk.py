@@ -55,6 +55,42 @@ class ClienteAsterisk:
         """Reproduce un archivo ya ubicado en el directorio de sonidos."""
         self.reproducir(canal, audio.stem)
 
+    def grabar(
+        self,
+        canal: str,
+        nombre: str,
+        duracion_maxima: int = 20,
+        silencio_maximo: int = 3,
+    ) -> None:
+        """Graba audio del canal hasta silencio o duración máxima."""
+        self._validar_nombre_grabacion(nombre)
+        self._solicitar(
+            "POST",
+            f"channels/{quote(canal, safe='')}/record",
+            params={
+                "name": nombre,
+                "format": "wav",
+                "maxDurationSeconds": duracion_maxima,
+                "maxSilenceSeconds": silencio_maximo,
+                "ifExists": "overwrite",
+                "beep": "false",
+                "terminateOn": "none",
+            },
+        )
+
+    def descargar_grabacion(self, nombre: str, destino: Path) -> Path:
+        """Descarga una grabación almacenada por Asterisk a una ruta controlada."""
+        self._validar_nombre_grabacion(nombre)
+        respuesta = self._solicitar("GET", f"recordings/stored/{quote(nombre, safe='')}/file")
+        destino.parent.mkdir(parents=True, exist_ok=True)
+        destino.write_bytes(respuesta.content)
+        return destino
+
+    @staticmethod
+    def _validar_nombre_grabacion(nombre: str) -> None:
+        if not nombre or not nombre.replace("-", "").isalnum():
+            raise ValueError("Nombre de grabación no permitido")
+
     def transferir(self, canal: str, tecnologia: str, destino: str) -> None:
         """Redirige el canal a un endpoint configurado, sin generar destinos libres."""
         if tecnologia not in {"PJSIP", "SIP"} or not destino.replace("-", "").isalnum():

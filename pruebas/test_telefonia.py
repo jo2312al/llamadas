@@ -69,6 +69,44 @@ def test_interpreta_evento_y_descarta_desconocido() -> None:
     assert interpretar_evento({"type": "DeviceStateChanged"}) is None
 
 
+def test_interpreta_eventos_de_reproduccion_y_grabacion() -> None:
+    reproduccion = interpretar_evento(
+        {
+            "type": "PlaybackFinished",
+            "playback": {"target_uri": "channel:canal-1", "id": "audio-1"},
+        }
+    )
+    grabacion = interpretar_evento(
+        {
+            "type": "RecordingFinished",
+            "recording": {"target_uri": "channel:canal-1", "name": "hotel-abc"},
+        }
+    )
+    assert reproduccion is not None
+    assert reproduccion.identificador_canal == "canal-1"
+    assert grabacion is not None
+    assert grabacion.identificador_canal == "canal-1"
+    assert grabacion.identificador_recurso == "hotel-abc"
+
+
+def test_graba_y_descarga_audio_por_ari(tmp_path) -> None:
+    cliente, solicitudes = crear_cliente([201, 200])
+    cliente.grabar("canal/1", "hotel-abc", duracion_maxima=10, silencio_maximo=2)
+    destino = cliente.descargar_grabacion("hotel-abc", tmp_path / "audio.wav")
+    cliente.cerrar()
+    assert solicitudes[0].url.path.endswith("channels/canal/1/record")
+    assert solicitudes[0].url.params["format"] == "wav"
+    assert solicitudes[1].url.raw_path.endswith(b"recordings/stored/hotel-abc/file")
+    assert destino.is_file()
+
+
+def test_rechaza_nombre_de_grabacion_inseguro() -> None:
+    cliente, _ = crear_cliente()
+    with pytest.raises(ValueError):
+        cliente.grabar("canal", "../grabacion")
+    cliente.cerrar()
+
+
 def test_sesiones_independientes_y_limite() -> None:
     gestor = GestorSesiones(duracion_maxima_segundos=60)
     primera = gestor.crear("uno")

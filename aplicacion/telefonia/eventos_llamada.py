@@ -26,6 +26,7 @@ class EventoLlamada(BaseModel):
     fecha: datetime = Field(default_factory=lambda: datetime.now(UTC))
     estado_canal: str | None = None
     digito: str | None = None
+    identificador_recurso: str | None = None
 
 
 def interpretar_evento(datos: dict[str, object]) -> EventoLlamada | None:
@@ -45,11 +46,26 @@ def interpretar_evento(datos: dict[str, object]) -> EventoLlamada | None:
     except ValueError:
         return None
     canal = datos.get("channel")
-    if not isinstance(canal, dict) or not canal.get("id"):
+    recurso: dict[str, object] | None = None
+    if tipo == TipoEvento.REPRODUCCION_TERMINADA:
+        posible = datos.get("playback")
+        recurso = posible if isinstance(posible, dict) else None
+    elif tipo == TipoEvento.GRABACION_TERMINADA:
+        posible = datos.get("recording")
+        recurso = posible if isinstance(posible, dict) else None
+    identificador_canal = canal.get("id") if isinstance(canal, dict) else None
+    if not identificador_canal and recurso:
+        objetivo = recurso.get("target_uri")
+        if isinstance(objetivo, str) and objetivo.startswith("channel:"):
+            identificador_canal = objetivo.removeprefix("channel:")
+    if not identificador_canal:
         raise ValueError("El evento ARI no contiene un canal válido")
     return EventoLlamada(
         tipo=tipo,
-        identificador_canal=str(canal["id"]),
-        estado_canal=str(canal.get("state")) if canal.get("state") else None,
+        identificador_canal=str(identificador_canal),
+        estado_canal=(
+            str(canal.get("state")) if isinstance(canal, dict) and canal.get("state") else None
+        ),
         digito=str(datos["digit"]) if datos.get("digit") else None,
+        identificador_recurso=(str(recurso["name"]) if recurso and recurso.get("name") else None),
     )

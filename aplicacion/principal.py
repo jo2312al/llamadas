@@ -13,6 +13,7 @@ from pathlib import Path
 
 from aplicacion.base_datos.conexion import conectar, migrar
 from aplicacion.configuracion import Configuracion, cargar_configuracion
+from aplicacion.reconocimiento_voz.servicio_whisper import ServicioWhisper
 from aplicacion.telefonia.cliente_asterisk import ClienteAsterisk, ErrorAsterisk
 from aplicacion.telefonia.eventos_ari import ReceptorEventosAri
 from aplicacion.telefonia.orquestador_ari import OrquestadorAri, ejecutar_eventos_ari
@@ -77,6 +78,11 @@ async def _ejecutar_servicio_ari(configuracion: Configuracion) -> None:
         secreto,
     )
     gestor = GestorSesiones(configuracion.duracion_maxima_llamada_segundos)
+    whisper = ServicioWhisper(
+        configuracion.binario_whisper,
+        configuracion.modelo_whisper,
+        configuracion.espera_whisper_segundos,
+    )
     detener = asyncio.Event()
     bucle = asyncio.get_running_loop()
     for senal in (signal.SIGTERM, signal.SIGINT):
@@ -86,7 +92,13 @@ async def _ejecutar_servicio_ari(configuracion: Configuracion) -> None:
     try:
         await ejecutar_eventos_ari(
             receptor,
-            OrquestadorAri(cliente, gestor, configuracion.sonido_bienvenida),
+            OrquestadorAri(
+                cliente,
+                gestor,
+                configuracion.sonido_bienvenida,
+                whisper,
+                configuracion.ruta_cache_audio / "grabaciones",
+            ),
             detener,
         )
     finally:
