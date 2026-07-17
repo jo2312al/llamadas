@@ -119,7 +119,7 @@ class OrquestadorAri:
                 )
 
     def _responder(self, sesion: SesionLlamada, mensaje: str) -> None:
-        if not self.ollama or not self.piper or not self.publicador:
+        if not self.piper or not self.publicador:
             return
         sistema = (
             "Eres el asistente telefónico de Hotel Villa Margaritas. "
@@ -127,14 +127,19 @@ class OrquestadorAri:
             "No inventes disponibilidad, precios ni reservaciones. Devuelve el JSON solicitado."
         )
         try:
-            resultado = self.ollama.analizar(sistema, mensaje)
-            sesion.intencion = resultado.intencion
-            audio = self.piper.sintetizar(resultado.texto_respuesta[:500])
+            if self.ollama:
+                resultado = self.ollama.analizar(sistema, mensaje)
+                intencion = resultado.intencion
+                texto_respuesta = resultado.texto_respuesta
+            else:
+                intencion, texto_respuesta = clasificar_turno_local(mensaje)
+            sesion.intencion = intencion
+            audio = self.piper.sintetizar(texto_respuesta[:500])
             sonido = self.publicador.publicar(audio)
             self.cliente.reproducir(sesion.identificador_llamada, sonido)
             REGISTRO.info(
                 "Respuesta generada para intención %s",
-                resultado.intencion,
+                intencion,
                 extra={"llamada": sesion.identificador_llamada},
             )
         except (ErrorComprension, ErrorPiper, ErrorPublicacionAudio, ErrorAsterisk):
@@ -159,6 +164,16 @@ class OrquestadorAri:
                 self.gestor.finalizar(sesion.identificador_llamada)
                 finalizadas += 1
         return finalizadas
+
+
+def clasificar_turno_local(mensaje: str) -> tuple[str, str]:
+    """Clasifica intenciones básicas sin inferencia ni decisiones sensibles."""
+    normalizado = mensaje.casefold()
+    if any(palabra in normalizado for palabra in ("recepción", "humano", "persona")):
+        return "transferencia", "Claro. Le comunicaré con recepción."
+    if any(palabra in normalizado for palabra in ("reserv", "habitación", "hosped")):
+        return "reservacion", "Con gusto. ¿Para qué fecha desea reservar?"
+    return "informacion", "Con gusto. ¿Qué información del hotel necesita?"
 
 
 async def ejecutar_eventos_ari(

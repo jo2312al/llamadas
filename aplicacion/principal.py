@@ -87,11 +87,13 @@ async def _ejecutar_servicio_ari(configuracion: Configuracion) -> None:
         configuracion.modelo_whisper,
         configuracion.espera_whisper_segundos,
     )
-    ollama = ClienteOllama(
-        configuracion.url_ollama,
-        configuracion.modelo_ollama,
-        configuracion.espera_ollama_segundos,
-    )
+    ollama = None
+    if not configuracion.modo_simulacion:
+        ollama = ClienteOllama(
+            configuracion.url_ollama,
+            configuracion.modelo_ollama,
+            configuracion.espera_ollama_segundos,
+        )
     piper = ServicioPiper(
         configuracion.binario_piper,
         configuracion.modelo_piper,

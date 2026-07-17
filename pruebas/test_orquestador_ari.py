@@ -9,7 +9,7 @@ from aplicacion.lenguaje.esquemas_ollama import RespuestaOllama
 from aplicacion.reconocimiento_voz.servicio_whisper import Transcripcion
 from aplicacion.telefonia.cliente_asterisk import ErrorAsterisk
 from aplicacion.telefonia.eventos_llamada import EventoLlamada, TipoEvento
-from aplicacion.telefonia.orquestador_ari import OrquestadorAri
+from aplicacion.telefonia.orquestador_ari import OrquestadorAri, clasificar_turno_local
 from aplicacion.telefonia.sesion_llamada import GestorSesiones
 
 
@@ -122,3 +122,9 @@ def test_transcripcion_genera_y_reproduce_respuesta(tmp_path) -> None:
     assert sesion.intencion == "reservacion"
     piper.sintetizar.assert_called_once_with("Con gusto. ¿Para qué fecha desea reservar?")
     cliente.reproducir.assert_called_once_with("canal-1", "hotel/generado/abc")
+
+
+def test_clasificador_local_no_inventa_datos() -> None:
+    intencion, respuesta = clasificar_turno_local("Quiero reservar una habitación")
+    assert intencion == "reservacion"
+    assert respuesta == "Con gusto. ¿Para qué fecha desea reservar?"

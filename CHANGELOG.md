@@ -14,6 +14,7 @@
 - Clasificación estructurada con Ollama y respuesta telefónica generada con Piper.
 - Tiempo de carga inicial de Ollama adaptado a CPU y modelo caliente durante 30 minutos.
 - Margen de Whisper ajustado para la contención de CPU durante llamadas concurrentes.
+- Clasificador local seguro para mantener el servicio operativo cuando Ollama está desactivado.
 
 ## 0.3.0 - 2026-07-17
 
