@@ -13,6 +13,7 @@
 - Cliente WebSocket autenticado para eventos ARI con reintentos finitos.
 - Credencial ARI transferida al entorno protegido del servicio y diagnóstico autenticado.
 - Orquestador idempotente de StasisStart/StasisEnd y cierre de llamadas vencidas.
+- Logging ARI visible en journald y permisos corregidos para CDR de Asterisk.
 
 ## 0.2.0 - 2026-07-17
 

@@ -18,7 +18,7 @@ preparar_servicio() {
   for ruta in /var/lib/asterisk /var/log/asterisk /var/spool/asterisk /var/run/asterisk; do
     sudo install -d -o asterisk -g asterisk -m 0750 "${ruta}"
   done
-  sudo chown -R asterisk:asterisk /etc/asterisk
+  sudo chown -R asterisk:asterisk /etc/asterisk /var/log/asterisk /var/lib/asterisk /var/spool/asterisk
   [[ -f "${UNIDAD}" ]] || { registrar "No existe la unidad systemd: ${UNIDAD}"; exit 4; }
   sudo install -m 0644 "${UNIDAD}" /etc/systemd/system/asterisk.service
   sudo systemctl daemon-reload

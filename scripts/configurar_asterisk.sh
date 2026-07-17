@@ -33,6 +33,7 @@ fi
 printf 'AGENTE_ARI_USUARIO=agente-hotel\nAGENTE_ARI_PASSWORD=%s\n' \
   "${ASTERISK_ARI_PASSWORD}" >>"${entorno_temporal}"
 sudo install -m 0640 -o root -g agente-hotel "${entorno_temporal}" "${archivo_entorno}"
+sudo chown -R asterisk:asterisk /var/log/asterisk /var/lib/asterisk /var/spool/asterisk
 sudo systemctl enable asterisk.service
 sudo systemctl restart asterisk.service
 sudo systemctl is-active --quiet asterisk.service
@@ -49,4 +50,7 @@ done
 [[ "${ari_disponible}" == true ]] || {
   echo "Asterisk inició, pero ARI no respondió con las credenciales configuradas."; exit 4;
 }
+if sudo systemctl is-enabled --quiet agente-telefonico.service; then
+  sudo systemctl restart agente-telefonico.service
+fi
 echo "Asterisk y ARI configurados correctamente en localhost."

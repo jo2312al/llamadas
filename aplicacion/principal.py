@@ -3,6 +3,7 @@
 import argparse
 import asyncio
 import contextlib
+import logging
 import shutil
 import signal
 import sqlite3
@@ -16,6 +17,14 @@ from aplicacion.telefonia.cliente_asterisk import ClienteAsterisk, ErrorAsterisk
 from aplicacion.telefonia.eventos_ari import ReceptorEventosAri
 from aplicacion.telefonia.orquestador_ari import OrquestadorAri, ejecutar_eventos_ari
 from aplicacion.telefonia.sesion_llamada import GestorSesiones
+
+
+def configurar_registros() -> None:
+    """Inicializa categorías de logging para journald sin datos sensibles."""
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(name)s %(message)s",
+    )
 
 
 def ejecutar_servicio(ruta_configuracion: Path) -> None:
@@ -127,6 +136,7 @@ def verificar_salud(ruta_configuracion: Path) -> int:
 
 def main() -> None:
     """Ejecuta comandos administrativos y el flujo básico por terminal."""
+    configurar_registros()
     analizador = argparse.ArgumentParser(description="Agente telefónico del hotel")
     analizador.add_argument("comando", choices=["migrar", "salud", "conversar", "servir"])
     analizador.add_argument("--configuracion", default="configuracion/configuracion_ejemplo.yaml")
