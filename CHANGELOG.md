@@ -1,5 +1,13 @@
 # Registro de cambios
 
+## 0.3.0 - 2026-07-17
+
+- Cliente REST de Asterisk ARI con operaciones explícitamente permitidas.
+- Interpretación validada de eventos de llamada relevantes.
+- Sesiones independientes y seguras para concurrencia.
+- Transferencia PJSIP controlada y límite máximo de duración.
+- Pruebas ARI simuladas sin llamadas ni puertos públicos.
+
 ## 0.2.0 - 2026-07-17
 
 - VAD ligero por energía RMS para PCM de 16 bits.

@@ -22,6 +22,10 @@ class Configuracion(BaseModel):
     umbral_voz_rms: int = Field(default=450, ge=1, le=32_767)
     espera_whisper_segundos: float = Field(default=25, gt=0, le=120)
     espera_piper_segundos: float = Field(default=15, gt=0, le=60)
+    url_ari: str = "http://127.0.0.1:8088"
+    aplicacion_ari: str = "agente-hotel"
+    extension_recepcion: str = "recepcion-101"
+    duracion_maxima_llamada_segundos: int = Field(default=900, ge=30, le=3600)
     campos_obligatorios: list[str] = Field(default_factory=list)
     modo_simulacion: bool = True
 

@@ -79,6 +79,18 @@ audio PCM mono de 8/16 kHz a una sesión aislada y conservar una extensión de
 transferencia. Ollama debe usar el prompt de `prompts/`. La telefonía en tiempo real y
 la conexión ARI permanecen para la Fase 3.
 
+La base de Fase 3 incluye un cliente ARI limitado a responder, reproducir, redirigir y
+colgar; normalización de eventos; sesiones concurrentes aisladas y límite configurable
+de duración. Los identificadores de canal se codifican, los sonidos rechazan recorridos
+de ruta y las transferencias solo aceptan endpoints SIP/PJSIP validados. Las pruebas usan
+`httpx.MockTransport` y nunca originan llamadas.
+
+Amazon Linux 2023 no publica Asterisk en los repositorios habilitados de esta VM. Antes
+de llamadas controladas se debe instalar una versión LTS desde una fuente verificada,
+mantener ARI en `127.0.0.1:8088`, crear credenciales fuera de Git y configurar el
+dialplan `Stasis(agente-hotel)`. La recepción debe probarse primero con un endpoint de
+laboratorio.
+
 ## Operación, seguridad y privacidad
 
 `make validar`, `make probar`, `make migrar`, `make estado` y `make respaldar` son los
