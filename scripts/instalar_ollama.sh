@@ -12,7 +12,8 @@ curl -fL --retry 3 -o "${temporal}/instalar.sh" \
 echo "${SHA_INSTALADOR}  ${temporal}/instalar.sh" | sha256sum -c -
 sudo env OLLAMA_VERSION="${VERSION}" sh "${temporal}/instalar.sh"
 sudo install -d -m 0755 /etc/systemd/system/ollama.service.d
-printf '%s\n' '[Service]' 'Environment="OLLAMA_HOST=127.0.0.1:11434"' | \
+printf '%s\n' '[Service]' 'Environment="OLLAMA_HOST=127.0.0.1:11434"' \
+  'Environment="OLLAMA_KEEP_ALIVE=30m"' | \
   sudo tee /etc/systemd/system/ollama.service.d/seguridad.conf >/dev/null
 sudo systemctl daemon-reload
 sudo systemctl enable --now ollama

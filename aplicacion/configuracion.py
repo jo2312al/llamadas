@@ -14,6 +14,7 @@ class Configuracion(BaseModel):
     ruta_base_datos: Path = Path("datos/agente.db")
     url_ollama: str = "http://127.0.0.1:11434"
     modelo_ollama: str = "qwen2.5:3b-instruct-q4_K_M"
+    espera_ollama_segundos: float = Field(default=60, gt=0, le=180)
     binario_whisper: Path = Path("/usr/local/bin/whisper-cli")
     modelo_whisper: Path = Path("modelos/ggml-small-q5_1.bin")
     binario_piper: Path = Path("/usr/local/bin/piper")
