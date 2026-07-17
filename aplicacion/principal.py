@@ -84,7 +84,11 @@ async def _ejecutar_servicio_ari(configuracion: Configuracion) -> None:
             bucle.add_signal_handler(senal, detener.set)
     print("Servicio ARI del agente telefónico iniciado", flush=True)
     try:
-        await ejecutar_eventos_ari(receptor, OrquestadorAri(cliente, gestor), detener)
+        await ejecutar_eventos_ari(
+            receptor,
+            OrquestadorAri(cliente, gestor, configuracion.sonido_bienvenida),
+            detener,
+        )
     finally:
         cliente.cerrar()
         print("Servicio ARI del agente telefónico detenido", flush=True)

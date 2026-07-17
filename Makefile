@@ -1,4 +1,4 @@
-.PHONY: instalar formato validar probar ejecutar migrar desplegar estado respaldar instalar-asterisk configurar-asterisk instalar-whisper instalar-piper
+.PHONY: instalar formato validar probar ejecutar migrar desplegar estado respaldar instalar-asterisk configurar-asterisk instalar-whisper instalar-piper preparar-audios
 instalar:
 	python -m pip install -r requirements-dev.txt
 formato:
@@ -28,3 +28,5 @@ instalar-whisper:
 	./scripts/instalar_whisper.sh
 instalar-piper:
 	./scripts/instalar_piper.sh
+preparar-audios:
+	./scripts/preparar_audios.sh

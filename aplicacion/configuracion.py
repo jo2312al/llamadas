@@ -26,6 +26,7 @@ class Configuracion(BaseModel):
     usuario_ari: str = "agente-hotel"
     contrasena_ari: SecretStr | None = None
     aplicacion_ari: str = "agente-hotel"
+    sonido_bienvenida: str = "hotel/bienvenida"
     extension_recepcion: str = "recepcion-101"
     duracion_maxima_llamada_segundos: int = Field(default=900, ge=30, le=3600)
     campos_obligatorios: list[str] = Field(default_factory=list)

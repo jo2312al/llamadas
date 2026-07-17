@@ -28,6 +28,14 @@ def test_inicio_contesta_una_sola_vez_y_fin_retira() -> None:
     assert gestor.obtener("canal-1") is None
 
 
+def test_inicio_reproduce_bienvenida_configurada() -> None:
+    cliente = Mock()
+    orquestador = OrquestadorAri(cliente, GestorSesiones(), "hotel/bienvenida")
+    orquestador.procesar(evento(TipoEvento.INICIO))
+    cliente.responder.assert_called_once_with("canal-1")
+    cliente.reproducir.assert_called_once_with("canal-1", "hotel/bienvenida")
+
+
 def test_error_al_responder_no_deja_sesion_huerfana() -> None:
     cliente = Mock()
     cliente.responder.side_effect = ErrorAsterisk("fallo")

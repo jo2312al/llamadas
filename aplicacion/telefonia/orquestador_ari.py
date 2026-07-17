@@ -15,9 +15,15 @@ REGISTRO = logging.getLogger("telefonia.ari")
 class OrquestadorAri:
     """Relaciona eventos ARI con sesiones sin delegar negocio al modelo."""
 
-    def __init__(self, cliente: ClienteAsterisk, gestor: GestorSesiones) -> None:
+    def __init__(
+        self,
+        cliente: ClienteAsterisk,
+        gestor: GestorSesiones,
+        sonido_bienvenida: str | None = None,
+    ) -> None:
         self.cliente = cliente
         self.gestor = gestor
+        self.sonido_bienvenida = sonido_bienvenida
 
     def procesar(self, evento: EventoLlamada) -> None:
         """Procesa un evento conocido con operaciones idempotentes.
@@ -39,6 +45,8 @@ class OrquestadorAri:
             self.gestor.crear(canal)
             try:
                 self.cliente.responder(canal)
+                if self.sonido_bienvenida:
+                    self.cliente.reproducir(canal, self.sonido_bienvenida)
             except ErrorAsterisk:
                 self.gestor.finalizar(canal)
                 raise
