@@ -21,8 +21,14 @@ def verificar_salud(ruta_configuracion: Path) -> int:
         resultados["base_datos"] = "correcta"
     except sqlite3.Error as error:
         resultados["base_datos"] = f"error: {error}"
-    for nombre, binario in {"whisper": "whisper-cli", "piper": "piper"}.items():
-        resultados[nombre] = "disponible" if shutil.which(binario) else "no instalado"
+    componentes = {
+        "whisper": configuracion.binario_whisper,
+        "modelo_whisper": configuracion.modelo_whisper,
+        "piper": configuracion.binario_piper,
+        "modelo_piper": configuracion.modelo_piper,
+    }
+    for nombre, ruta in componentes.items():
+        resultados[nombre] = "disponible" if ruta.is_file() else "no instalado"
     libre = shutil.disk_usage(configuracion.ruta_base_datos.parent).free // (1024 * 1024)
     resultados["disco_libre_mib"] = str(libre)
     for clave, valor in resultados.items():

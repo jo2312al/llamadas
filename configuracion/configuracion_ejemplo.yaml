@@ -2,6 +2,14 @@ nombre_hotel: Hotel Villa Margaritas
 ruta_base_datos: datos/agente.db
 url_ollama: http://127.0.0.1:11434
 modelo_ollama: qwen2.5:3b-instruct-q4_K_M
+binario_whisper: /usr/local/bin/whisper-cli
+modelo_whisper: modelos/ggml-small-q5_1.bin
+binario_piper: /usr/local/bin/piper
+modelo_piper: modelos/es_MX-claude-high.onnx
+ruta_cache_audio: datos/cache_audio
+umbral_voz_rms: 450
+espera_whisper_segundos: 25
+espera_piper_segundos: 15
 modo_simulacion: true
 campos_obligatorios:
   - nombre_completo
@@ -11,4 +19,3 @@ campos_obligatorios:
   - numero_adultos
   - tipo_habitacion
   - consentimiento_contacto
-

@@ -60,13 +60,24 @@ repositorio en la ruta indicada, copie la configuración sin sobrescribir una ex
 instale la unidad systemd y habilítela. `scripts/desplegar.sh` usa bloqueo, revisión
 exacta, migración, salud y rollback. No despliega si la validación falla.
 
-## Asterisk, Ollama, Whisper y Piper
+## Audio local, Whisper y Piper
+
+La Fase 2 incorpora un VAD por energía RMS para PCM S16LE, conversión WAV, ejecución
+de `whisper.cpp` y Piper sin shell, timeouts estrictos y caché TTS por SHA-256. El VAD
+no sustituye a un clasificador neuronal en ambientes muy ruidosos; ajuste
+`umbral_voz_rms` con grabaciones controladas antes de recibir llamadas.
+
+Las rutas y límites están en `configuracion/configuracion_ejemplo.yaml`. Para una prueba
+local, coloque los binarios y modelos fuera de Git, ejecute `salud` y use WAV mono de
+16 kHz. Los adaptadores rechazan archivos ausentes, salidas vacías y procesos que
+excedan el tiempo. Los modelos nunca se descargan durante las pruebas automatizadas.
+
+## Asterisk y Ollama
 
 Mantenga ARI y Ollama en `127.0.0.1`; no publique sus puertos. Asterisk debe entregar
 audio PCM mono de 8/16 kHz a una sesión aislada y conservar una extensión de
-transferencia. Ollama debe usar el prompt de `prompts/`; Whisper y Piper deben invocarse
-como procesos con timeout y límites. Aún no se incluyen las integraciones reales: son
-Fases 2 y 3.
+transferencia. Ollama debe usar el prompt de `prompts/`. La telefonía en tiempo real y
+la conexión ARI permanecen para la Fase 3.
 
 ## Operación, seguridad y privacidad
 
@@ -81,4 +92,3 @@ Problemas comunes: revise `journalctl -u agente-telefonico`, espacio, permisos d
 `datos/`, disponibilidad local de Ollama y que el modelo configurado aparezca en
 `ollama list`. Esta versión ofrece flujo terminal y persistencia; audio, telefonía,
 notificaciones reales, disponibilidad autorizada y llamadas externas siguen pendientes.
-
