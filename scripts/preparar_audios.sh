@@ -11,10 +11,10 @@ sudo dnf install -y sox
 temporal="$(mktemp -d)"
 trap 'rm -rf "${temporal}"' EXIT
 /usr/local/bin/piper --model "${MODELO}" --output-file "${temporal}/original.wav" -- "${FRASE}"
-sox -v 0.9 "${temporal}/original.wav" -r 16000 -c 1 -b 16 -e signed-integer "${temporal}/bienvenida.wav"
+sox -v 0.9 "${temporal}/original.wav" -r 8000 -c 1 -b 16 -e signed-integer "${temporal}/bienvenida.wav"
 frecuencia="$(soxi -r "${temporal}/bienvenida.wav")"
 canales="$(soxi -c "${temporal}/bienvenida.wav")"
-[[ "${frecuencia}" == "16000" && "${canales}" == "1" ]] || {
+[[ "${frecuencia}" == "8000" && "${canales}" == "1" ]] || {
   echo "El audio convertido no cumple el formato telefónico."; exit 3;
 }
 sudo install -d -o asterisk -g asterisk -m 0750 "$(dirname "${DESTINO}")"

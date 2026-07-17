@@ -52,7 +52,10 @@ class ReceptorEventosAri:
                     ping_timeout=10,
                 ) as websocket:
                     while True:
-                        mensaje = await asyncio.wait_for(websocket.recv(), self.espera_segundos)
+                        # La ausencia de llamadas no es un fallo. El propio WebSocket
+                        # comprueba la conexión mediante ping/pong y recv espera hasta
+                        # un evento o el cierre del servidor.
+                        mensaje = await websocket.recv()
                         evento = decodificar_evento(mensaje)
                         if evento:
                             yield evento

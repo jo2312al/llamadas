@@ -7,7 +7,8 @@
 - Voz Piper mexicana de alta calidad administrada fuera de Git.
 - Adaptador Piper actualizado a la CLI vigente.
 - Medición real Piper→Whisper en EC2 y transcripción española verificada.
-- Bienvenida Piper convertida a WAV mono de 16 kHz y reproducción desde ARI.
+- Bienvenida Piper convertida a WAV mono telefónico de 8 kHz y reproducción desde ARI.
+- Receptor WebSocket ARI estable durante periodos sin llamadas.
 
 ## 0.3.0 - 2026-07-17
 
