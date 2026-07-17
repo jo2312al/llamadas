@@ -3,10 +3,10 @@
 import asyncio
 import contextlib
 import logging
-import re
 from pathlib import Path
 from uuid import uuid4
 
+from aplicacion.conversacion.flujo_reservacion import FlujoReservacion, clasificar_intencion
 from aplicacion.lenguaje.cliente_ollama import ClienteOllama, ErrorComprension
 from aplicacion.modelos.conversacion import SesionLlamada
 from aplicacion.reconocimiento_voz.servicio_whisper import ErrorWhisper, ServicioWhisper
@@ -36,6 +36,7 @@ class OrquestadorAri:
         ollama: ClienteOllama | None = None,
         piper: ServicioPiper | None = None,
         publicador: PublicadorAudioAsterisk | None = None,
+        flujo_reservacion: FlujoReservacion | None = None,
     ) -> None:
         self.cliente = cliente
         self.gestor = gestor
@@ -45,6 +46,7 @@ class OrquestadorAri:
         self.ollama = ollama
         self.piper = piper
         self.publicador = publicador
+        self.flujo_reservacion = flujo_reservacion
 
     def procesar(self, evento: EventoLlamada) -> None:
         """Procesa un evento conocido con operaciones idempotentes.
@@ -138,6 +140,8 @@ class OrquestadorAri:
                 resultado = self.ollama.analizar(sistema, mensaje)
                 intencion = resultado.intencion
                 texto_respuesta = resultado.texto_respuesta
+            elif self.flujo_reservacion:
+                intencion, texto_respuesta = self.flujo_reservacion.procesar(sesion, mensaje)
             else:
                 intencion, texto_respuesta = clasificar_turno_local(mensaje)
             sesion.intencion = intencion
@@ -175,12 +179,7 @@ class OrquestadorAri:
 
 def clasificar_turno_local(mensaje: str) -> tuple[str, str]:
     """Clasifica intenciones básicas sin inferencia ni decisiones sensibles."""
-    palabras = set(re.findall(r"\w+", mensaje.casefold()))
-    if palabras.intersection({"recepción", "humano", "persona"}):
-        return "transferencia", "Claro. Le comunicaré con recepción."
-    if any(palabra.startswith(("reserv", "habitaci", "hosped")) for palabra in palabras):
-        return "reservacion", "Con gusto. ¿Para qué fecha desea reservar?"
-    return "informacion", "Con gusto. ¿Qué información del hotel necesita?"
+    return clasificar_intencion(mensaje)
 
 
 async def ejecutar_eventos_ari(

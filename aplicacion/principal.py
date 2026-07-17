@@ -13,6 +13,8 @@ from pathlib import Path
 
 from aplicacion.base_datos.conexion import conectar, migrar
 from aplicacion.configuracion import Configuracion, cargar_configuracion
+from aplicacion.conversacion.flujo_reservacion import FlujoReservacion
+from aplicacion.disponibilidad.servicio import ServicioDisponibilidad
 from aplicacion.lenguaje.cliente_ollama import ClienteOllama
 from aplicacion.reconocimiento_voz.servicio_whisper import ServicioWhisper
 from aplicacion.sintesis_voz.cache_audio import CacheAudio
@@ -101,6 +103,8 @@ async def _ejecutar_servicio_ari(configuracion: Configuracion) -> None:
         configuracion.espera_piper_segundos,
     )
     publicador = PublicadorAudioAsterisk(Path("/var/lib/asterisk/sounds/hotel/generado"))
+    conexion_disponibilidad = conectar(configuracion.ruta_base_datos)
+    flujo_reservacion = FlujoReservacion(ServicioDisponibilidad(conexion_disponibilidad))
     detener = asyncio.Event()
     bucle = asyncio.get_running_loop()
     for senal in (signal.SIGTERM, signal.SIGINT):
@@ -119,11 +123,13 @@ async def _ejecutar_servicio_ari(configuracion: Configuracion) -> None:
                 ollama,
                 piper,
                 publicador,
+                flujo_reservacion,
             ),
             detener,
         )
     finally:
         cliente.cerrar()
+        conexion_disponibilidad.close()
         print("Servicio ARI del agente telefónico detenido", flush=True)
 
 
