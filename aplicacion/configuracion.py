@@ -21,7 +21,7 @@ class Configuracion(BaseModel):
     modelo_piper: Path = Path("modelos/es_MX-claude-high.onnx")
     ruta_cache_audio: Path = Path("datos/cache_audio")
     umbral_voz_rms: int = Field(default=450, ge=1, le=32_767)
-    espera_whisper_segundos: float = Field(default=25, gt=0, le=120)
+    espera_whisper_segundos: float = Field(default=45, gt=0, le=120)
     espera_piper_segundos: float = Field(default=15, gt=0, le=60)
     url_ari: str = "http://127.0.0.1:8088"
     usuario_ari: str = "agente-hotel"

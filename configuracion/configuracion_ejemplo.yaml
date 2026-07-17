@@ -9,7 +9,7 @@ binario_piper: /usr/local/bin/piper
 modelo_piper: /opt/agente-telefonico-hotel/modelos/es_MX-claude-high.onnx
 ruta_cache_audio: datos/cache_audio
 umbral_voz_rms: 450
-espera_whisper_segundos: 25
+espera_whisper_segundos: 45
 espera_piper_segundos: 15
 url_ari: http://127.0.0.1:8088
 usuario_ari: agente-hotel
