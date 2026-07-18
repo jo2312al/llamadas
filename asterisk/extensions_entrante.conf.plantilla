@@ -1,0 +1,8 @@
+; Solo se alcanza desde el endpoint identificado del proveedor SIP.
+[entrante-hotel]
+exten => __SIP_DID__,1,NoOp(Llamada entrante al agente del hotel)
+ same => n,Stasis(agente-hotel)
+ same => n,Hangup()
+
+exten => +__SIP_DID__,1,Goto(entrante-hotel,__SIP_DID__,1)
+exten => s,1,Goto(entrante-hotel,__SIP_DID__,1)

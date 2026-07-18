@@ -100,6 +100,19 @@ mantener ARI en `127.0.0.1:8088`, crear credenciales fuera de Git y configurar e
 dialplan `Stasis(agente-hotel)`. La recepción debe probarse primero con un endpoint de
 laboratorio.
 
+### Primera llamada desde la red pública
+
+Las llamadas internas ARI, Whisper y Piper están verificadas en EC2. Para recibir una
+llamada pública se necesita un DID y una troncal de un proveedor SIP. Defina fuera de
+Git `SIP_PROVEEDOR_HOST`, `SIP_USUARIO`, `SIP_PASSWORD`, `SIP_DID`,
+`SIP_PROVEEDOR_CIDR` y `SIP_IP_PUBLICA`; después ejecute `make configurar-troncal`.
+La plantilla usa G.711 ulaw/alaw, NAT simétrico e identificación por CIDR del proveedor.
+
+En el Security Group autorice UDP 5060 y UDP 10000-20000 únicamente desde las redes
+publicadas por el proveedor. No publique ARI 8088 ni Ollama 11434. Ejecute
+`./scripts/verificar_prellamada.sh` antes de marcar el DID. Si el proveedor requiere
+TLS, otro puerto o un rango RTP diferente, adapte esos valores antes de instalar.
+
 ## Operación, seguridad y privacidad
 
 `make validar`, `make probar`, `make migrar`, `make estado` y `make respaldar` son los

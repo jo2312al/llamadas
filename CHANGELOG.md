@@ -24,6 +24,8 @@
   conectado a la disponibilidad real antes de presentar cupo.
 - Confirmación, contacto y consentimiento antes de bloquear inventario, persistir
   la solicitud y enviarla por API con clave de idempotencia.
+- Plantilla e instalador de troncal SIP entrante con NAT, CIDR de proveedor, respaldo
+  y verificación previa a la primera llamada pública.
 
 ## 0.3.0 - 2026-07-17
 
