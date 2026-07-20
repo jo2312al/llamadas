@@ -34,7 +34,7 @@ context=laboratorio-agente
 disallow=all
 allow=ulaw,alaw
 auth=telefono-prueba-auth
-aors=telefono-prueba-aor
+aors=telefono-prueba
 direct_media=no
 rtp_symmetric=yes
 force_rport=yes
@@ -47,7 +47,7 @@ auth_type=userpass
 username=telefono-prueba
 password=${contrasena}
 
-[telefono-prueba-aor]
+[telefono-prueba]
 type=aor
 max_contacts=1
 remove_existing=yes

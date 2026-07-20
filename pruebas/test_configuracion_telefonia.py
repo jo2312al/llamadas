@@ -41,5 +41,7 @@ def test_telefono_de_prueba_solo_usa_transporte_tailscale() -> None:
     assert "tailscale ip -4" in contenido
     assert "bind=${ip_tailscale}:5060" in contenido
     assert "context=laboratorio-agente" in contenido
+    assert "aors=telefono-prueba" in contenido
+    assert "[telefono-prueba]\ntype=aor" in contenido
     assert "openssl rand" in contenido
     assert "password=${contrasena}" in contenido

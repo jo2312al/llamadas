@@ -60,7 +60,7 @@ class ClienteAsterisk:
         canal: str,
         nombre: str,
         duracion_maxima: int = 20,
-        silencio_maximo: int = 3,
+        silencio_maximo: int = 1,
     ) -> None:
         """Graba audio del canal hasta silencio o duración máxima."""
         self._validar_nombre_grabacion(nombre)

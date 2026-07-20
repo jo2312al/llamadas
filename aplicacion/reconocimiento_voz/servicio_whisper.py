@@ -86,6 +86,7 @@ class ServicioWhisper:
             "-t",
             str(self.hilos),
             "-oj",
+            "-nt",
             "-of",
             str(salida),
             "--no-prints",
