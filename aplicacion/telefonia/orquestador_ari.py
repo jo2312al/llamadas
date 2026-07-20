@@ -143,19 +143,9 @@ class OrquestadorAri:
     def _responder(self, sesion: SesionLlamada, mensaje: str) -> None:
         if not self.piper or not self.publicador:
             return
-        sistema = (
-            "Eres el asistente telefónico de Hotel Villa Margaritas. "
-            "Identifica la intención y responde en español, amable y brevemente. "
-            "No inventes disponibilidad, precios ni reservaciones. Devuelve el JSON solicitado."
-        )
         try:
-            if self.ollama:
-                resultado = self.ollama.analizar(sistema, mensaje)
-                intencion = resultado.intencion
-                texto_respuesta = resultado.texto_respuesta
-            elif self.flujo_reservacion:
-                intencion, texto_respuesta = self.flujo_reservacion.procesar(sesion, mensaje)
-                texto_respuesta = self._aplicar_respaldo_teclado(sesion, texto_respuesta)
+            if self.flujo_reservacion:
+                intencion, texto_respuesta = self._procesar_flujo(sesion, mensaje)
             else:
                 intencion, texto_respuesta = clasificar_turno_local(mensaje)
             sesion.intencion = intencion
@@ -174,21 +164,98 @@ class OrquestadorAri:
                 extra={"llamada": sesion.identificador_llamada},
             )
 
+    def _procesar_flujo(self, sesion: SesionLlamada, mensaje: str) -> tuple[str, str]:
+        """Da siempre la autoridad al flujo y usa Ollama sólo para normalizar ambigüedad."""
+        assert self.flujo_reservacion
+        mensaje_validable = mensaje
+        if sesion.estado_actual == EstadoConversacion.BIENVENIDA:
+            intencion_local, _ = clasificar_intencion(mensaje)
+            if intencion_local != "reservacion":
+                mensaje_validable = self._normalizar_con_ollama(sesion, mensaje)
+
+        intencion, respuesta = self.flujo_reservacion.procesar(sesion, mensaje_validable)
+        if self._es_repregunta(respuesta) and mensaje_validable == mensaje:
+            normalizado = self._normalizar_con_ollama(sesion, mensaje)
+            if normalizado != mensaje:
+                intencion, respuesta = self.flujo_reservacion.procesar(sesion, normalizado)
+        return intencion, self._aplicar_respaldo_teclado(sesion, respuesta)
+
+    def _normalizar_con_ollama(self, sesion: SesionLlamada, mensaje: str) -> str:
+        if not self.ollama:
+            return mensaje
+        sistema = (
+            "Extrae datos del mensaje para un flujo de reservación de hotel. "
+            "No decidas disponibilidad, precios, confirmaciones ni acciones. "
+            "No inventes valores. Devuelve únicamente el JSON del esquema solicitado."
+        )
+        try:
+            resultado = self.ollama.analizar(sistema, mensaje)
+        except ErrorComprension:
+            REGISTRO.warning(
+                "Ollama no pudo normalizar el turno; se conserva el flujo local",
+                extra={"llamada": sesion.identificador_llamada},
+            )
+            return mensaje
+        if resultado.confianza < 0.75:
+            return mensaje
+        datos_extraidos = resultado.datos_extraidos
+        if sesion.estado_actual == EstadoConversacion.BIENVENIDA:
+            return "quiero reservar" if resultado.intencion == "reservacion" else mensaje
+        if sesion.estado_actual == EstadoConversacion.CONFIRMAR_DATOS:
+            if sesion.datos.nombre_completo is None and datos_extraidos.nombre_completo:
+                return datos_extraidos.nombre_completo
+            if sesion.datos.telefono is None and datos_extraidos.telefono:
+                return datos_extraidos.telefono
+            return mensaje
+        if sesion.estado_actual != EstadoConversacion.RECOPILAR_DATOS:
+            return mensaje
+        datos = sesion.datos
+        if datos.fecha_entrada is None:
+            return (
+                datos_extraidos.fecha_entrada_iso or datos_extraidos.fecha_entrada_texto or mensaje
+            )
+        if datos.numero_noches is None and datos_extraidos.numero_noches is not None:
+            return str(datos_extraidos.numero_noches)
+        if datos.numero_habitaciones is None and datos_extraidos.numero_habitaciones is not None:
+            return str(datos_extraidos.numero_habitaciones)
+        if len(datos.habitaciones) < (datos.numero_habitaciones or 0):
+            if sesion.tipo_habitacion_actual is None and datos_extraidos.tipo_habitacion:
+                return datos_extraidos.tipo_habitacion
+            if (
+                sesion.adultos_habitacion_actual is None
+                and datos_extraidos.numero_adultos is not None
+            ):
+                return str(datos_extraidos.numero_adultos)
+            if (
+                sesion.menores_habitacion_actual is None
+                and datos_extraidos.numero_menores is not None
+            ):
+                return str(datos_extraidos.numero_menores)
+            if datos_extraidos.edades_menores:
+                return " ".join(map(str, datos_extraidos.edades_menores))
+        return mensaje
+
+    @staticmethod
+    def _es_repregunta(respuesta: str) -> bool:
+        return respuesta.startswith(
+            (
+                "No comprendí",
+                "Indique",
+                "Esa habitación",
+                "La ocupación",
+                "Diga las edades",
+                "Diga continuar",
+                "Dígame su nombre",
+            )
+        )
+
     def _aplicar_respaldo_teclado(self, sesion: SesionLlamada, respuesta: str) -> str:
         if respuesta.startswith("¿Cuál es su número de teléfono?"):
             sesion.modo_teclado = True
             sesion.campo_teclado = "telefono"
             sesion.entrada_teclado = ""
             return "Marque su número de teléfono y termine con la tecla gato."
-        prefijos_repregunta = (
-            "No comprendí",
-            "Indique",
-            "Esa habitación",
-            "La ocupación",
-            "Diga las edades",
-            "Diga continuar",
-        )
-        if not respuesta.startswith(prefijos_repregunta):
+        if not self._es_repregunta(respuesta):
             sesion.numero_intentos = 0
             sesion.modo_teclado = False
             sesion.campo_teclado = None

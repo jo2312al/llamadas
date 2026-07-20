@@ -95,13 +95,17 @@ def test_fin_de_grabacion_transcribe_y_actualiza_sesion(tmp_path) -> None:
 
 
 def test_transcripcion_genera_y_reproduce_respuesta(tmp_path) -> None:
-    cliente, whisper, ollama, piper, publicador = (Mock() for _ in range(5))
+    cliente, whisper, ollama, piper, publicador, flujo = (Mock() for _ in range(6))
     whisper.transcribir.return_value = Transcripcion("Quiero reservar")
     ollama.analizar.return_value = RespuestaOllama(
         intencion="reservacion",
         confianza=0.95,
         accion_sugerida="preguntar_campo",
         texto_respuesta="Con gusto. ¿Para qué fecha desea reservar?",
+    )
+    flujo.procesar.return_value = (
+        "reservacion",
+        "Con gusto. ¿Para qué fecha desea reservar?",
     )
     piper.sintetizar.return_value = tmp_path / ("a" * 64 + ".wav")
     publicador.publicar.return_value = "hotel/generado/abc"
@@ -115,6 +119,7 @@ def test_transcripcion_genera_y_reproduce_respuesta(tmp_path) -> None:
         ollama=ollama,
         piper=piper,
         publicador=publicador,
+        flujo_reservacion=flujo,
     )
     orquestador.procesar(
         EventoLlamada(
@@ -126,8 +131,34 @@ def test_transcripcion_genera_y_reproduce_respuesta(tmp_path) -> None:
     sesion = gestor.obtener("canal-1")
     assert sesion is not None
     assert sesion.intencion == "reservacion"
+    flujo.procesar.assert_called_once_with(sesion, "Quiero reservar")
+    ollama.analizar.assert_not_called()
     piper.sintetizar.assert_called_once_with("Con gusto. ¿Para qué fecha desea reservar?")
     cliente.reproducir.assert_called_once_with("canal-1", "hotel/generado/abc")
+
+
+def test_ollama_solo_normaliza_intencion_ambigua_y_flujo_decide() -> None:
+    ollama, flujo = Mock(), Mock()
+    ollama.analizar.return_value = RespuestaOllama(
+        intencion="reservacion",
+        confianza=0.92,
+        accion_sugerida="continuar",
+        texto_respuesta="Hay disponibilidad y cuesta cero pesos.",
+    )
+    flujo.procesar.return_value = (
+        "reservacion",
+        "Con gusto. ¿Cuál es su fecha de entrada?",
+    )
+    gestor = GestorSesiones()
+    sesion = gestor.crear("canal-1")
+    orquestador = OrquestadorAri(Mock(), gestor, ollama=ollama, flujo_reservacion=flujo)
+
+    intencion, respuesta = orquestador._procesar_flujo(sesion, "quiero apartar")
+
+    flujo.procesar.assert_called_once_with(sesion, "quiero reservar")
+    assert intencion == "reservacion"
+    assert respuesta == "Con gusto. ¿Cuál es su fecha de entrada?"
+    assert "cero pesos" not in respuesta
 
 
 def test_clasificador_local_no_inventa_datos() -> None:
