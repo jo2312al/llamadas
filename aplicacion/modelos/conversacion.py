@@ -48,3 +48,5 @@ class SesionLlamada(BaseModel):
     tipo_habitacion_actual: str | None = None
     adultos_habitacion_actual: int | None = None
     menores_habitacion_actual: int | None = None
+    modo_teclado: bool = False
+    campo_teclado: str | None = None

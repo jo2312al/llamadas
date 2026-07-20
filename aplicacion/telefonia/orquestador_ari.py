@@ -79,6 +79,8 @@ class OrquestadorAri:
         elif evento.tipo == TipoEvento.FIN:
             if self.gestor.finalizar(canal):
                 REGISTRO.info("Sesión de llamada finalizada", extra={"llamada": canal})
+        elif evento.tipo == TipoEvento.DTMF:
+            self._procesar_dtmf(canal, evento.digito)
         elif evento.tipo == TipoEvento.REPRODUCCION_TERMINADA and self.whisper:
             sesion = self.gestor.obtener(canal)
             if sesion and sesion.estado_actual == EstadoConversacion.FINALIZAR:
@@ -86,7 +88,7 @@ class OrquestadorAri:
                     self.cliente.colgar(canal)
                 except ErrorAsterisk:
                     REGISTRO.info("El canal ya estaba finalizado", extra={"llamada": canal})
-            elif sesion:
+            elif sesion and not sesion.modo_teclado:
                 try:
                     self._iniciar_grabacion(canal)
                 except ErrorAsterisk:
@@ -148,6 +150,7 @@ class OrquestadorAri:
                 texto_respuesta = resultado.texto_respuesta
             elif self.flujo_reservacion:
                 intencion, texto_respuesta = self.flujo_reservacion.procesar(sesion, mensaje)
+                texto_respuesta = self._aplicar_respaldo_teclado(sesion, texto_respuesta)
             else:
                 intencion, texto_respuesta = clasificar_turno_local(mensaje)
             sesion.intencion = intencion
@@ -165,6 +168,44 @@ class OrquestadorAri:
                 "Falló la respuesta conversacional",
                 extra={"llamada": sesion.identificador_llamada},
             )
+
+    def _aplicar_respaldo_teclado(self, sesion: SesionLlamada, respuesta: str) -> str:
+        prefijos_repregunta = (
+            "No comprendí",
+            "Indique",
+            "Esa habitación",
+            "La ocupación",
+            "Diga las edades",
+            "Diga continuar",
+        )
+        if not respuesta.startswith(prefijos_repregunta):
+            sesion.numero_intentos = 0
+            sesion.modo_teclado = False
+            sesion.campo_teclado = None
+            return respuesta
+        sesion.numero_intentos += 1
+        campo, instrucciones = opcion_teclado_para(sesion)
+        if sesion.numero_intentos < 2 or not campo:
+            return respuesta
+        sesion.modo_teclado = True
+        sesion.campo_teclado = campo
+        return f"No logré comprenderle. {instrucciones}"
+
+    def _procesar_dtmf(self, canal: str, digito: str | None) -> None:
+        sesion = self.gestor.obtener(canal)
+        if not sesion or not sesion.modo_teclado or not digito:
+            return
+        mensaje = traducir_dtmf(sesion.campo_teclado, digito)
+        if mensaje is None:
+            if self.piper and self.publicador:
+                audio = self.piper.sintetizar("Opción inválida. Intente nuevamente.")
+                sonido = self.publicador.publicar(audio)
+                self.cliente.reproducir(canal, sonido)
+            return
+        sesion.modo_teclado = False
+        sesion.campo_teclado = None
+        sesion.numero_intentos = 0
+        self._responder(sesion, mensaje)
 
     def finalizar_vencidas(self) -> int:
         """Cuelga y retira llamadas que excedieron el límite configurado."""
@@ -186,6 +227,50 @@ class OrquestadorAri:
 def clasificar_turno_local(mensaje: str) -> tuple[str, str]:
     """Clasifica intenciones básicas sin inferencia ni decisiones sensibles."""
     return clasificar_intencion(mensaje)
+
+
+def opcion_teclado_para(sesion: SesionLlamada) -> tuple[str | None, str]:
+    """Obtiene el campo estructurado que puede responderse mediante DTMF."""
+    if sesion.estado_actual == EstadoConversacion.PRESENTAR_OPCIONES:
+        return "confirmacion", "Marque 1 para confirmar o 2 para cancelar."
+    if sesion.estado_actual != EstadoConversacion.RECOPILAR_DATOS:
+        return None, ""
+
+    datos = sesion.datos
+    if datos.fecha_entrada is None or datos.numero_noches is None:
+        return None, ""
+    if datos.numero_habitaciones is None:
+        return "habitaciones", "Marque del 1 al 4 para indicar cuantas habitaciones desea."
+    if len(datos.habitaciones) < datos.numero_habitaciones:
+        if sesion.tipo_habitacion_actual is None:
+            return "tipo", "Marque 1 para doble, 2 para king o 3 para suite."
+        if sesion.adultos_habitacion_actual is None:
+            limite = 2 if sesion.tipo_habitacion_actual == "king" else 4
+            return "adultos", f"Marque del 1 al {limite} para indicar los adultos."
+        if sesion.menores_habitacion_actual is None:
+            limite = 4 - sesion.adultos_habitacion_actual
+            return "menores", f"Marque del 0 al {limite} para indicar los niños."
+        return None, ""
+    if datos.hora_llegada is None:
+        return (
+            "llegada",
+            "Marque 1 para 5 de la mañana, 2 para 3 de la tarde, "
+            "3 para 6 de la tarde o 4 para 10 de la noche.",
+        )
+    return None, ""
+
+
+def traducir_dtmf(campo: str | None, digito: str) -> str | None:
+    """Traduce una tecla a una respuesta que valida el flujo de negocio normal."""
+    opciones = {
+        "habitaciones": {str(numero): str(numero) for numero in range(1, 5)},
+        "tipo": {"1": "doble", "2": "king", "3": "suite"},
+        "adultos": {str(numero): str(numero) for numero in range(1, 5)},
+        "menores": {str(numero): str(numero) for numero in range(0, 5)},
+        "llegada": {"1": "5 am", "2": "3 pm", "3": "6 pm", "4": "10 pm"},
+        "confirmacion": {"1": "sí confirmo", "2": "no"},
+    }
+    return opciones.get(campo, {}).get(digito)
 
 
 async def ejecutar_eventos_ari(

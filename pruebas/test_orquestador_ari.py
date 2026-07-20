@@ -1,6 +1,6 @@
 """Pruebas del orquestador de sesiones ARI."""
 
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from unittest.mock import Mock
 
 import pytest
@@ -10,7 +10,11 @@ from aplicacion.modelos.conversacion import EstadoConversacion
 from aplicacion.reconocimiento_voz.servicio_whisper import Transcripcion
 from aplicacion.telefonia.cliente_asterisk import ErrorAsterisk
 from aplicacion.telefonia.eventos_llamada import EventoLlamada, TipoEvento
-from aplicacion.telefonia.orquestador_ari import OrquestadorAri, clasificar_turno_local
+from aplicacion.telefonia.orquestador_ari import (
+    OrquestadorAri,
+    clasificar_turno_local,
+    traducir_dtmf,
+)
 from aplicacion.telefonia.sesion_llamada import GestorSesiones
 
 
@@ -153,3 +157,39 @@ def test_cuelga_despues_de_reproducir_respuesta_final() -> None:
         evento(TipoEvento.REPRODUCCION_TERMINADA)
     )
     cliente.colgar.assert_called_once_with("canal-1")
+
+
+def test_dos_repreguntas_activan_teclado_para_tipo_de_habitacion() -> None:
+    gestor = GestorSesiones()
+    sesion = gestor.crear("canal-1")
+    sesion.estado_actual = EstadoConversacion.RECOPILAR_DATOS
+    sesion.datos.fecha_entrada = date(2026, 8, 1)
+    sesion.datos.numero_noches = 1
+    sesion.datos.numero_habitaciones = 1
+    orquestador = OrquestadorAri(Mock(), gestor)
+
+    primera = orquestador._aplicar_respaldo_teclado(sesion, "Indique doble, king o suite.")
+    segunda = orquestador._aplicar_respaldo_teclado(sesion, "Indique doble, king o suite.")
+
+    assert primera == "Indique doble, king o suite."
+    assert segunda.endswith("Marque 1 para doble, 2 para king o 3 para suite.")
+    assert sesion.modo_teclado is True
+    assert sesion.campo_teclado == "tipo"
+
+
+def test_dtmf_traduce_opciones_de_negocio() -> None:
+    assert traducir_dtmf("tipo", "2") == "king"
+    assert traducir_dtmf("confirmacion", "1") == "sí confirmo"
+    assert traducir_dtmf("llegada", "4") == "10 pm"
+    assert traducir_dtmf("tipo", "9") is None
+
+
+def test_modo_teclado_no_inicia_otra_grabacion() -> None:
+    cliente = Mock()
+    gestor = GestorSesiones()
+    sesion = gestor.crear("canal-1")
+    sesion.modo_teclado = True
+    OrquestadorAri(cliente, gestor, whisper=Mock()).procesar(
+        evento(TipoEvento.REPRODUCCION_TERMINADA)
+    )
+    cliente.grabar.assert_not_called()
