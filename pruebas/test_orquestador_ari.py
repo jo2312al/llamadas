@@ -153,7 +153,7 @@ def test_ollama_solo_normaliza_intencion_ambigua_y_flujo_decide() -> None:
     sesion = gestor.crear("canal-1")
     orquestador = OrquestadorAri(Mock(), gestor, ollama=ollama, flujo_reservacion=flujo)
 
-    intencion, respuesta = orquestador._procesar_flujo(sesion, "quiero apartar")
+    intencion, respuesta = orquestador._procesar_flujo(sesion, "quiero un lugar")
 
     flujo.procesar.assert_called_once_with(sesion, "quiero reservar")
     assert intencion == "reservacion"

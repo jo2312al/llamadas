@@ -6,6 +6,13 @@ from collections import Counter
 from datetime import date, time, timedelta
 
 from aplicacion.base_datos.repositorio_reservaciones import guardar_solicitud
+from aplicacion.conversacion.indice_lenguaje import (
+    buscar_respuesta_frecuente,
+    buscar_tipo_habitacion,
+    es_afirmacion,
+    es_negacion,
+    es_solicitud_reservacion,
+)
 from aplicacion.conversacion.maquina_estados import transicionar
 from aplicacion.disponibilidad.servicio import ServicioDisponibilidad, normalizar_tipo
 from aplicacion.integraciones.api_reservas import ClienteApiReservas, ErrorApiReservas
@@ -342,20 +349,16 @@ def clasificar_intencion(mensaje: str) -> tuple[str, str]:
     """Clasifica solicitudes iniciales comunes, incluso si llegan abreviadas."""
     texto = quitar_acentos(mensaje.casefold())
     palabras = set(re.findall(r"\w+", texto))
-    if palabras.intersection({"recepcion", "humano", "persona"}):
-        return "transferencia", "Claro. Le comunicaré con recepción."
-    raices_reservacion = (
-        "reserv",
-        "habitaci",
-        "hosped",
-        "aloj",
-        "estancia",
-        "cuarto",
-        "dormir",
-        "quedar",
-    )
-    if any(palabra.startswith(raices_reservacion) for palabra in palabras):
+    if es_solicitud_reservacion(mensaje):
         return "reservacion", "Con gusto. ¿Para qué fecha desea reservar?"
+    if palabras.intersection({"recepcion", "humano"}):
+        return (
+            "informacion",
+            "No puedo transferir la llamada. El horario de recepción y ventas es de lunes "
+            "a sábado, de 7 de la mañana a 11 de la noche.",
+        )
+    if respuesta := buscar_respuesta_frecuente(mensaje):
+        return "informacion", respuesta
     return "informacion", "Con gusto. ¿Qué información del hotel necesita?"
 
 
@@ -405,11 +408,7 @@ def _fecha_sin_ano(dia: int, mes: int, referencia: date) -> date | None:
 
 
 def extraer_tipo(mensaje: str) -> str:
-    palabras = set(re.findall(r"\w+", mensaje.casefold()))
-    for tipo in ("doble", "dobles", "king", "suite", "suites"):
-        if tipo in palabras:
-            return tipo
-    return mensaje
+    return buscar_tipo_habitacion(mensaje) or mensaje
 
 
 def extraer_numero(mensaje: str) -> int | None:
@@ -479,13 +478,11 @@ def calcular_total(datos) -> int:
 
 
 def es_afirmativo(mensaje: str) -> bool:
-    palabras = set(re.findall(r"\w+", quitar_acentos(mensaje.casefold())))
-    return bool(palabras.intersection({"si", "confirmo", "continuar", "adelante"}))
+    return es_afirmacion(mensaje)
 
 
 def es_negativo(mensaje: str) -> bool:
-    palabras = set(re.findall(r"\w+", quitar_acentos(mensaje.casefold())))
-    return bool(palabras.intersection({"no", "negativo"}))
+    return es_negacion(mensaje)
 
 
 def detectar_cambio(mensaje: str) -> str | None:
