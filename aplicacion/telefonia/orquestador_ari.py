@@ -3,6 +3,7 @@
 import asyncio
 import contextlib
 import logging
+import re
 from pathlib import Path
 from uuid import uuid4
 
@@ -65,7 +66,11 @@ class OrquestadorAri:
             if self.gestor.obtener(canal) is not None:
                 REGISTRO.warning("Se ignoró StasisStart duplicado", extra={"llamada": canal})
                 return
-            self.gestor.crear(canal)
+            sesion = self.gestor.crear(canal)
+            numero_origen = normalizar_telefono(evento.numero_origen)
+            if numero_origen:
+                sesion.datos.telefono = numero_origen
+                sesion.datos.consentimiento_contacto = True
             try:
                 self.cliente.responder(canal)
                 if self.sonido_bienvenida:
@@ -170,6 +175,11 @@ class OrquestadorAri:
             )
 
     def _aplicar_respaldo_teclado(self, sesion: SesionLlamada, respuesta: str) -> str:
+        if respuesta.startswith("¿Cuál es su número de teléfono?"):
+            sesion.modo_teclado = True
+            sesion.campo_teclado = "telefono"
+            sesion.entrada_teclado = ""
+            return "Marque su número de teléfono y termine con la tecla gato."
         prefijos_repregunta = (
             "No comprendí",
             "Indique",
@@ -195,6 +205,9 @@ class OrquestadorAri:
         sesion = self.gestor.obtener(canal)
         if not sesion or not sesion.modo_teclado or not digito:
             return
+        if sesion.campo_teclado == "telefono":
+            self._procesar_telefono_dtmf(sesion, digito)
+            return
         mensaje = traducir_dtmf(sesion.campo_teclado, digito)
         if mensaje is None:
             if self.piper and self.publicador:
@@ -206,6 +219,30 @@ class OrquestadorAri:
         sesion.campo_teclado = None
         sesion.numero_intentos = 0
         self._responder(sesion, mensaje)
+
+    def _procesar_telefono_dtmf(self, sesion: SesionLlamada, digito: str) -> None:
+        if digito == "*":
+            sesion.entrada_teclado = ""
+            return
+        if digito != "#":
+            if digito.isdigit() and len(sesion.entrada_teclado) < 15:
+                sesion.entrada_teclado += digito
+            return
+        telefono = sesion.entrada_teclado
+        if not 10 <= len(telefono) <= 15:
+            sesion.entrada_teclado = ""
+            if self.piper and self.publicador:
+                audio = self.piper.sintetizar(
+                    "El número debe tener entre diez y quince dígitos. "
+                    "Márquelo nuevamente y termine con gato."
+                )
+                sonido = self.publicador.publicar(audio)
+                self.cliente.reproducir(sesion.identificador_llamada, sonido)
+            return
+        sesion.modo_teclado = False
+        sesion.campo_teclado = None
+        sesion.entrada_teclado = ""
+        self._responder(sesion, telefono)
 
     def finalizar_vencidas(self) -> int:
         """Cuelga y retira llamadas que excedieron el límite configurado."""
@@ -271,6 +308,12 @@ def traducir_dtmf(campo: str | None, digito: str) -> str | None:
         "confirmacion": {"1": "sí confirmo", "2": "no"},
     }
     return opciones.get(campo, {}).get(digito)
+
+
+def normalizar_telefono(valor: str | None) -> str | None:
+    """Acepta como identificador de origen únicamente números telefónicos plausibles."""
+    digitos = "".join(re.findall(r"\d", valor or ""))
+    return digitos if 10 <= len(digitos) <= 15 else None
 
 
 async def ejecutar_eventos_ari(

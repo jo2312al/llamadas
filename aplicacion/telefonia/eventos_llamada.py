@@ -27,6 +27,7 @@ class EventoLlamada(BaseModel):
     estado_canal: str | None = None
     digito: str | None = None
     identificador_recurso: str | None = None
+    numero_origen: str | None = None
 
 
 def interpretar_evento(datos: dict[str, object]) -> EventoLlamada | None:
@@ -68,4 +69,11 @@ def interpretar_evento(datos: dict[str, object]) -> EventoLlamada | None:
         ),
         digito=str(datos["digit"]) if datos.get("digit") else None,
         identificador_recurso=(str(recurso["name"]) if recurso and recurso.get("name") else None),
+        numero_origen=(
+            str(canal["caller"]["number"])
+            if isinstance(canal, dict)
+            and isinstance(canal.get("caller"), dict)
+            and canal["caller"].get("number")
+            else None
+        ),
     )

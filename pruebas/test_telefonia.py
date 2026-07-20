@@ -69,6 +69,21 @@ def test_interpreta_evento_y_descarta_desconocido() -> None:
     assert interpretar_evento({"type": "DeviceStateChanged"}) is None
 
 
+def test_interpreta_numero_de_origen_en_inicio() -> None:
+    evento = interpretar_evento(
+        {
+            "type": "StasisStart",
+            "channel": {
+                "id": "abc",
+                "state": "Ring",
+                "caller": {"number": "529931234567", "name": "Cliente"},
+            },
+        }
+    )
+    assert evento is not None
+    assert evento.numero_origen == "529931234567"
+
+
 def test_interpreta_eventos_de_reproduccion_y_grabacion() -> None:
     reproduccion = interpretar_evento(
         {

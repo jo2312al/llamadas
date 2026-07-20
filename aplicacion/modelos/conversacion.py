@@ -50,3 +50,4 @@ class SesionLlamada(BaseModel):
     menores_habitacion_actual: int | None = None
     modo_teclado: bool = False
     campo_teclado: str | None = None
+    entrada_teclado: str = ""

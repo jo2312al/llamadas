@@ -246,6 +246,8 @@ class FlujoReservacion:
             if len(nombre) < 5 or any(caracter.isdigit() for caracter in nombre):
                 return "Dígame su nombre y apellidos, por favor."
             datos.nombre_completo = nombre[:120]
+            if datos.telefono:
+                return self._finalizar_contacto(sesion)
             return "¿Cuál es su número de teléfono?"
         if datos.telefono is None:
             telefono = "".join(re.findall(r"\d", mensaje))
@@ -253,15 +255,17 @@ class FlujoReservacion:
                 return "Indique un teléfono de entre diez y quince dígitos."
             datos.telefono = telefono
             datos.consentimiento_contacto = True
-            try:
-                return self._registrar_y_enviar(sesion)
-            except ValueError:
-                datos.consentimiento_contacto = None
-                return (
-                    "La disponibilidad cambió antes de registrar. "
-                    "Recepción revisará otras opciones."
-                )
+            return self._finalizar_contacto(sesion)
         return "Su solicitud ya fue registrada."
+
+    def _finalizar_contacto(self, sesion: SesionLlamada) -> str:
+        try:
+            return self._registrar_y_enviar(sesion)
+        except ValueError:
+            sesion.datos.consentimiento_contacto = None
+            return (
+                "La disponibilidad cambió antes de registrar. " "Recepción revisará otras opciones."
+            )
 
     def _registrar_y_enviar(self, sesion: SesionLlamada) -> str:
         entrada = sesion.datos.fecha_entrada

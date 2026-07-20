@@ -13,6 +13,7 @@ from aplicacion.telefonia.eventos_llamada import EventoLlamada, TipoEvento
 from aplicacion.telefonia.orquestador_ari import (
     OrquestadorAri,
     clasificar_turno_local,
+    normalizar_telefono,
     traducir_dtmf,
 )
 from aplicacion.telefonia.sesion_llamada import GestorSesiones
@@ -193,3 +194,46 @@ def test_modo_teclado_no_inicia_otra_grabacion() -> None:
         evento(TipoEvento.REPRODUCCION_TERMINADA)
     )
     cliente.grabar.assert_not_called()
+
+
+def test_inicio_guarda_numero_telefonico_del_llamante() -> None:
+    gestor = GestorSesiones()
+    orquestador = OrquestadorAri(Mock(), gestor)
+    orquestador.procesar(
+        EventoLlamada(
+            tipo=TipoEvento.INICIO,
+            identificador_canal="canal-1",
+            numero_origen="+52 993 123 4567",
+        )
+    )
+    sesion = gestor.obtener("canal-1")
+    assert sesion is not None
+    assert sesion.datos.telefono == "529931234567"
+
+
+def test_telefono_se_captura_por_dtmf_hasta_gato(tmp_path) -> None:
+    cliente, piper, publicador, flujo = (Mock() for _ in range(4))
+    piper.sintetizar.return_value = tmp_path / "respuesta.wav"
+    publicador.publicar.return_value = "hotel/respuesta"
+    flujo.procesar.return_value = ("reservacion", "Solicitud registrada.")
+    gestor = GestorSesiones()
+    sesion = gestor.crear("canal-1")
+    sesion.modo_teclado = True
+    sesion.campo_teclado = "telefono"
+    orquestador = OrquestadorAri(
+        cliente, gestor, piper=piper, publicador=publicador, flujo_reservacion=flujo
+    )
+    for digito in "9931234567#":
+        orquestador.procesar(
+            EventoLlamada(
+                tipo=TipoEvento.DTMF,
+                identificador_canal="canal-1",
+                digito=digito,
+            )
+        )
+    flujo.procesar.assert_called_once_with(sesion, "9931234567")
+    assert sesion.modo_teclado is False
+
+
+def test_rechaza_identificador_sip_que_no_es_telefono() -> None:
+    assert normalizar_telefono("telefono-prueba") is None
