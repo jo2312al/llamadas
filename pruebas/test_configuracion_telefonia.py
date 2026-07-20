@@ -32,3 +32,14 @@ def test_diagnostico_exige_objetos_reales_y_registro_aceptado() -> None:
     assert "Endpoint:[[:space:]]+proveedor-hotel/" in contenido
     assert "Registro SIP aceptado por el proveedor" in contenido
     assert "Registered" in contenido
+
+
+def test_telefono_de_prueba_solo_usa_transporte_tailscale() -> None:
+    contenido = Path("scripts/configurar_telefono_tailscale.sh").read_text(
+        encoding="utf-8"
+    )
+    assert "tailscale ip -4" in contenido
+    assert "bind=${ip_tailscale}:5060" in contenido
+    assert "context=laboratorio-agente" in contenido
+    assert "openssl rand" in contenido
+    assert "password=${contrasena}" in contenido
