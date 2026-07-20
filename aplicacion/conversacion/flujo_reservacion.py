@@ -335,11 +335,22 @@ class FlujoReservacion:
 
 
 def clasificar_intencion(mensaje: str) -> tuple[str, str]:
-    """Clasifica la intención inicial mediante palabras completas."""
-    palabras = set(re.findall(r"\w+", mensaje.casefold()))
-    if palabras.intersection({"recepción", "humano", "persona"}):
+    """Clasifica solicitudes iniciales comunes, incluso si llegan abreviadas."""
+    texto = quitar_acentos(mensaje.casefold())
+    palabras = set(re.findall(r"\w+", texto))
+    if palabras.intersection({"recepcion", "humano", "persona"}):
         return "transferencia", "Claro. Le comunicaré con recepción."
-    if any(palabra.startswith(("reserv", "habitaci", "hosped")) for palabra in palabras):
+    raices_reservacion = (
+        "reserv",
+        "habitaci",
+        "hosped",
+        "aloj",
+        "estancia",
+        "cuarto",
+        "dormir",
+        "quedar",
+    )
+    if any(palabra.startswith(raices_reservacion) for palabra in palabras):
         return "reservacion", "Con gusto. ¿Para qué fecha desea reservar?"
     return "informacion", "Con gusto. ¿Qué información del hotel necesita?"
 

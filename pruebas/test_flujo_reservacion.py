@@ -7,6 +7,7 @@ from aplicacion.base_datos.conexion import conectar, migrar
 from aplicacion.conversacion.flujo_reservacion import (
     FlujoReservacion,
     calcular_precio_noche,
+    clasificar_intencion,
     extraer_fecha,
     extraer_hora,
     extraer_numero,
@@ -41,6 +42,22 @@ def test_extrae_fechas_relativas_sin_ano_y_con_dia_hablado() -> None:
     assert extraer_fecha("treinta y uno de julio", referencia) == date(2026, 7, 31)
     assert extraer_fecha("15 de agosto", referencia) == date(2026, 8, 15)
     assert extraer_fecha("10/7", referencia) == date(2027, 7, 10)
+
+
+def test_entiende_variantes_comunes_para_iniciar_reservacion() -> None:
+    frases = (
+        "hacer una reservación",
+        "habitación",
+        "quiero reservar",
+        "necesito un cuarto",
+        "quiero hospedarme",
+        "busco alojamiento",
+        "quiero quedarme una noche",
+    )
+    for frase in frases:
+        intencion, respuesta = clasificar_intencion(frase)
+        assert intencion == "reservacion"
+        assert "fecha" in respuesta
 
 
 def test_varias_habitaciones_ninos_y_total(tmp_path: Path) -> None:
