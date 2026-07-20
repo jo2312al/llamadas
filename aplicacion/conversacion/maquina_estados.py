@@ -27,6 +27,7 @@ TRANSICIONES: dict[EstadoConversacion, set[EstadoConversacion]] = {
     EstadoConversacion.PRESENTAR_OPCIONES: {
         EstadoConversacion.CONFIRMAR_DATOS,
         EstadoConversacion.RECOPILAR_DATOS,
+        EstadoConversacion.FINALIZAR,
     },
     EstadoConversacion.CONFIRMAR_DATOS: {
         EstadoConversacion.GUARDAR_SOLICITUD,

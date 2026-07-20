@@ -68,10 +68,24 @@ class FlujoReservacion:
 
         datos = sesion.datos
         if sesion.estado_actual == EstadoConversacion.PRESENTAR_OPCIONES:
-            if not es_afirmativo(mensaje):
-                return "reservacion", "De acuerdo. ¿Desea cambiar fechas o tipo de habitación?"
-            transicionar(sesion, EstadoConversacion.CONFIRMAR_DATOS)
-            return "reservacion", "Para registrar la solicitud, dígame su nombre completo."
+            cambio = detectar_cambio(mensaje)
+            if cambio:
+                transicionar(sesion, EstadoConversacion.RECOPILAR_DATOS)
+                return "reservacion", self._reiniciar_dato(sesion, cambio)
+            if es_afirmativo(mensaje):
+                transicionar(sesion, EstadoConversacion.CONFIRMAR_DATOS)
+                return "reservacion", "Para registrar la solicitud, dígame su nombre completo."
+            if es_negativo(mensaje) or desea_cancelar(mensaje):
+                transicionar(sesion, EstadoConversacion.FINALIZAR)
+                return (
+                    "reservacion",
+                    "De acuerdo, no registraré la solicitud. Gracias por llamar.",
+                )
+            return (
+                "reservacion",
+                "Diga continuar, cambiar fechas, cambiar habitación, "
+                "cambiar huéspedes o cancelar.",
+            )
 
         if sesion.estado_actual == EstadoConversacion.CONFIRMAR_DATOS:
             return "reservacion", self._recopilar_contacto(sesion, mensaje)
@@ -106,6 +120,20 @@ class FlujoReservacion:
             return "reservacion", self._consultar_y_responder(sesion)
 
         return "reservacion", self._consultar_y_responder(sesion)
+
+    @staticmethod
+    def _reiniciar_dato(sesion: SesionLlamada, cambio: str) -> str:
+        datos = sesion.datos
+        if cambio == "fechas":
+            datos.fecha_entrada = None
+            datos.fecha_salida = None
+            datos.numero_noches = None
+            return "Claro. ¿Cuál será la nueva fecha de entrada?"
+        if cambio == "habitacion":
+            datos.tipo_habitacion = None
+            return "Claro. ¿Prefiere habitación doble, king o suite?"
+        datos.numero_adultos = None
+        return "Claro. ¿Cuántos adultos se hospedarán?"
 
     def _recopilar_contacto(self, sesion: SesionLlamada, mensaje: str) -> str:
         datos = sesion.datos
@@ -256,6 +284,23 @@ def es_afirmativo(mensaje: str) -> bool:
 def es_negativo(mensaje: str) -> bool:
     palabras = set(re.findall(r"\w+", quitar_acentos(mensaje.casefold())))
     return bool(palabras.intersection({"no", "negativo"}))
+
+
+def detectar_cambio(mensaje: str) -> str | None:
+    """Identifica el dato que el huésped desea corregir."""
+    palabras = set(re.findall(r"\w+", quitar_acentos(mensaje.casefold())))
+    if palabras.intersection({"fecha", "fechas", "entrada", "salida", "dia", "dias"}):
+        return "fechas"
+    if palabras.intersection({"habitacion", "habitaciones", "doble", "king", "suite"}):
+        return "habitacion"
+    if palabras.intersection({"adulto", "adultos", "huesped", "huespedes", "persona", "personas"}):
+        return "huespedes"
+    return None
+
+
+def desea_cancelar(mensaje: str) -> bool:
+    palabras = set(re.findall(r"\w+", quitar_acentos(mensaje.casefold())))
+    return bool(palabras.intersection({"cancelar", "cancela", "terminar", "finalizar"}))
 
 
 def quitar_acentos(texto: str) -> str:

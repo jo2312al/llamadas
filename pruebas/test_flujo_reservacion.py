@@ -109,3 +109,48 @@ def test_no_envia_ni_bloquea_sin_consentimiento(tmp_path: Path) -> None:
         ]
         == 0
     )
+
+
+def test_cambia_fechas_desde_la_confirmacion_sin_quedar_en_bucle(tmp_path: Path) -> None:
+    flujo, _ = crear_flujo(tmp_path)
+    sesion = SesionLlamada(identificador_llamada="llamada-cambio")
+    for mensaje in (
+        "Quiero reservar",
+        "10 de agosto de 2027",
+        "12 de agosto de 2027",
+        "doble",
+        "dos adultos",
+    ):
+        flujo.procesar(sesion, mensaje)
+
+    respuesta = flujo.procesar(sesion, "sí, quiero cambiar las fechas")[1]
+
+    assert "nueva fecha de entrada" in respuesta
+    assert sesion.estado_actual == EstadoConversacion.RECOPILAR_DATOS
+    assert sesion.datos.fecha_entrada is None
+    assert sesion.datos.fecha_salida is None
+    assert "salida" in flujo.procesar(sesion, "20 de agosto de 2027")[1]
+
+
+def test_rechaza_la_opcion_y_finaliza_sin_repetir_la_pregunta(tmp_path: Path) -> None:
+    flujo, disponibilidad = crear_flujo(tmp_path)
+    sesion = SesionLlamada(identificador_llamada="llamada-cancelada")
+    for mensaje in (
+        "Quiero reservar",
+        "10 de agosto de 2027",
+        "12 de agosto de 2027",
+        "suite",
+        "dos adultos",
+    ):
+        flujo.procesar(sesion, mensaje)
+
+    respuesta = flujo.procesar(sesion, "no, gracias")[1]
+
+    assert "no registraré" in respuesta
+    assert sesion.estado_actual == EstadoConversacion.FINALIZAR
+    assert (
+        disponibilidad.conexion.execute("SELECT count(*) FROM solicitudes_reservacion").fetchone()[
+            0
+        ]
+        == 0
+    )
