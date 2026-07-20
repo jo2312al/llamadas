@@ -75,6 +75,12 @@ class ServicioWhisper:
                 raise ErrorWhisper(f"No existe el {etiqueta} de Whisper: {ruta}")
 
     def _crear_comando(self, audio_wav: Path, salida: Path) -> list[str]:
+        contexto = (
+            "Reservación de Hotel Villa Margaritas en español mexicano. "
+            "Habitación doble, king o suite; fecha de entrada, noches, "
+            "habitaciones, adultos, niños, edades, hora de llegada, "
+            "sí confirmo, nombre completo y número de teléfono."
+        )
         return [
             str(self.binario),
             "-m",
@@ -87,6 +93,8 @@ class ServicioWhisper:
             str(self.hilos),
             "-oj",
             "-nt",
+            "--prompt",
+            contexto,
             "-of",
             str(salida),
             "--no-prints",
