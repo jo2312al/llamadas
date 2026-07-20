@@ -6,7 +6,9 @@ from pathlib import Path
 from aplicacion.base_datos.conexion import conectar, migrar
 from aplicacion.conversacion.flujo_reservacion import (
     FlujoReservacion,
+    calcular_precio_noche,
     extraer_fecha,
+    extraer_hora,
     extraer_numero,
 )
 from aplicacion.disponibilidad.servicio import ServicioDisponibilidad
@@ -25,6 +27,37 @@ def test_extrae_fechas_y_numeros_hablados() -> None:
     assert extraer_fecha("12 de agosto", date(2027, 8, 10)) == date(2027, 8, 12)
     assert extraer_fecha("2027-09-03") == date(2027, 9, 3)
     assert extraer_numero("seríamos dos adultos") == 2
+    assert extraer_hora("seis de la tarde").hour == 18
+    assert calcular_precio_noche("doble", 2) == 700
+    assert calcular_precio_noche("doble", 3) == 800
+
+
+def test_varias_habitaciones_ninos_y_total(tmp_path: Path) -> None:
+    flujo, _ = crear_flujo(tmp_path)
+    sesion = SesionLlamada(identificador_llamada="llamada-multiple")
+    mensajes = (
+        "Quiero reservar",
+        "10 de agosto de 2027",
+        "dos noches",
+        "dos habitaciones",
+        "doble",
+        "dos adultos",
+        "dos niños",
+        "5 y 8",
+        "suite",
+        "cuatro adultos",
+        "cero niños",
+        "5 am",
+    )
+    respuesta = ""
+    for mensaje in mensajes:
+        respuesta = flujo.procesar(sesion, mensaje)[1]
+
+    assert "Sí hay disponibilidad" in respuesta
+    assert "3200 pesos" in respuesta
+    assert "llegada anticipada" in respuesta
+    assert len(sesion.datos.habitaciones) == 2
+    assert sesion.datos.numero_menores == 2
 
 
 def test_recopila_un_dato_por_turno_y_consulta_inventario(tmp_path: Path) -> None:
@@ -33,13 +66,17 @@ def test_recopila_un_dato_por_turno_y_consulta_inventario(tmp_path: Path) -> Non
     sesion = SesionLlamada(identificador_llamada="llamada-1")
 
     assert "fecha" in flujo.procesar(sesion, "Quiero reservar")[1]
-    assert "salida" in flujo.procesar(sesion, "10 de agosto de 2027")[1]
-    assert "doble" in flujo.procesar(sesion, "12 de agosto de 2027")[1]
+    assert "noches" in flujo.procesar(sesion, "10 de agosto de 2027")[1]
+    assert "habitaciones" in flujo.procesar(sesion, "dos noches")[1]
+    assert "tipo" in flujo.procesar(sesion, "una habitación")[1]
     assert "adultos" in flujo.procesar(sesion, "habitación doble")[1]
-    intencion, respuesta = flujo.procesar(sesion, "dos adultos")
+    assert "niños" in flujo.procesar(sesion, "dos adultos")[1]
+    assert "hora" in flujo.procesar(sesion, "cero niños")[1]
+    intencion, respuesta = flujo.procesar(sesion, "6 de la tarde")
 
     assert intencion == "reservacion"
-    assert respuesta == "Hay 14 habitaciones doble disponibles. ¿Desea continuar con la solicitud?"
+    assert "Sí hay disponibilidad" in respuesta
+    assert "1400 pesos" in respuesta
     assert sesion.datos.numero_noches == 2
     assert sesion.datos.numero_adultos == 2
     assert sesion.estado_actual == EstadoConversacion.PRESENTAR_OPCIONES
@@ -52,10 +89,13 @@ def test_repregunta_fecha_invalida_y_reporta_sin_cupo(tmp_path: Path) -> None:
     flujo.procesar(sesion, "Necesito una habitación")
     assert "No comprendí" in flujo.procesar(sesion, "el próximo mes")[1]
     flujo.procesar(sesion, "1 de septiembre de 2027")
-    flujo.procesar(sesion, "3 de septiembre de 2027")
+    flujo.procesar(sesion, "dos noches")
+    flujo.procesar(sesion, "una habitación")
     flujo.procesar(sesion, "suite")
-    respuesta = flujo.procesar(sesion, "2")[1]
-    assert respuesta == "No hay habitaciones suite disponibles en esas fechas."
+    flujo.procesar(sesion, "2")
+    flujo.procesar(sesion, "cero")
+    respuesta = flujo.procesar(sesion, "6 pm")[1]
+    assert respuesta == "No hay disponibilidad para toda la reservación solicitada."
 
 
 def test_confirma_contacto_guarda_y_bloquea_inventario(tmp_path: Path) -> None:
@@ -64,16 +104,18 @@ def test_confirma_contacto_guarda_y_bloquea_inventario(tmp_path: Path) -> None:
     for mensaje in (
         "Quiero reservar",
         "10 de agosto de 2027",
-        "12 de agosto de 2027",
+        "dos noches",
+        "una habitación",
         "king",
         "dos adultos",
+        "cero niños",
+        "6 pm",
     ):
         flujo.procesar(sesion, mensaje)
 
     assert "nombre" in flujo.procesar(sesion, "sí, continuar")[1]
     assert "teléfono" in flujo.procesar(sesion, "Ana Pérez López")[1]
-    assert "Autoriza" in flujo.procesar(sesion, "5512345678")[1]
-    respuesta = flujo.procesar(sesion, "sí autorizo")[1]
+    respuesta = flujo.procesar(sesion, "5512345678")[1]
 
     assert "registrada correctamente" in respuesta
     assert sesion.estado_actual == EstadoConversacion.FINALIZAR
@@ -87,22 +129,22 @@ def test_confirma_contacto_guarda_y_bloquea_inventario(tmp_path: Path) -> None:
     assert disponibilidad.consultar(date(2027, 8, 10), date(2027, 8, 12))[1].disponibles == 4
 
 
-def test_no_envia_ni_bloquea_sin_consentimiento(tmp_path: Path) -> None:
+def test_no_bloquea_si_cancela_antes_de_confirmar(tmp_path: Path) -> None:
     flujo, disponibilidad = crear_flujo(tmp_path)
     sesion = SesionLlamada(identificador_llamada="llamada-4")
     for mensaje in (
         "Quiero reservar",
         "10 de agosto de 2027",
-        "12 de agosto de 2027",
+        "dos noches",
+        "una habitación",
         "suite",
         "2",
-        "sí",
-        "Luis Hernández Soto",
-        "5512345678",
+        "cero",
+        "6 pm",
     ):
         flujo.procesar(sesion, mensaje)
     respuesta = flujo.procesar(sesion, "no")[1]
-    assert "no enviaré sus datos" in respuesta
+    assert "no registraré" in respuesta
     assert (
         disponibilidad.conexion.execute("SELECT count(*) FROM solicitudes_reservacion").fetchone()[
             0
@@ -117,9 +159,12 @@ def test_cambia_fechas_desde_la_confirmacion_sin_quedar_en_bucle(tmp_path: Path)
     for mensaje in (
         "Quiero reservar",
         "10 de agosto de 2027",
-        "12 de agosto de 2027",
+        "dos noches",
+        "una habitación",
         "doble",
         "dos adultos",
+        "cero niños",
+        "6 pm",
     ):
         flujo.procesar(sesion, mensaje)
 
@@ -129,7 +174,7 @@ def test_cambia_fechas_desde_la_confirmacion_sin_quedar_en_bucle(tmp_path: Path)
     assert sesion.estado_actual == EstadoConversacion.RECOPILAR_DATOS
     assert sesion.datos.fecha_entrada is None
     assert sesion.datos.fecha_salida is None
-    assert "salida" in flujo.procesar(sesion, "20 de agosto de 2027")[1]
+    assert "noches" in flujo.procesar(sesion, "20 de agosto de 2027")[1]
 
 
 def test_rechaza_la_opcion_y_finaliza_sin_repetir_la_pregunta(tmp_path: Path) -> None:
@@ -138,9 +183,12 @@ def test_rechaza_la_opcion_y_finaliza_sin_repetir_la_pregunta(tmp_path: Path) ->
     for mensaje in (
         "Quiero reservar",
         "10 de agosto de 2027",
-        "12 de agosto de 2027",
+        "dos noches",
+        "una habitación",
         "suite",
         "dos adultos",
+        "cero niños",
+        "6 pm",
     ):
         flujo.procesar(sesion, mensaje)
 

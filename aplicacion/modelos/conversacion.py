@@ -45,3 +45,6 @@ class SesionLlamada(BaseModel):
     requiere_revision: bool = False
     motivo_revision: str | None = None
     transferencia_solicitada: bool = False
+    tipo_habitacion_actual: str | None = None
+    adultos_habitacion_actual: int | None = None
+    menores_habitacion_actual: int | None = None

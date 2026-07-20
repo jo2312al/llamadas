@@ -2,14 +2,19 @@
 
 import re
 import unicodedata
-from datetime import date
+from collections import Counter
+from datetime import date, time
 
 from aplicacion.base_datos.repositorio_reservaciones import guardar_solicitud
 from aplicacion.conversacion.maquina_estados import transicionar
 from aplicacion.disponibilidad.servicio import ServicioDisponibilidad, normalizar_tipo
 from aplicacion.integraciones.api_reservas import ClienteApiReservas, ErrorApiReservas
 from aplicacion.modelos.conversacion import EstadoConversacion, SesionLlamada
-from aplicacion.modelos.reservacion import SolicitudReservacion
+from aplicacion.modelos.reservacion import (
+    DetalleHabitacion,
+    EstadoSolicitud,
+    SolicitudReservacion,
+)
 
 MESES = {
     "enero": 1,
@@ -27,6 +32,7 @@ MESES = {
     "diciembre": 12,
 }
 NUMEROS = {
+    "cero": 0,
     "uno": 1,
     "una": 1,
     "dos": 2,
@@ -61,7 +67,7 @@ class FlujoReservacion:
             if intencion != "reservacion":
                 return intencion, respuesta
             transicionar(sesion, EstadoConversacion.RECOPILAR_DATOS)
-            return intencion, "Con gusto. ¿Para qué fecha desea reservar?"
+            return intencion, "Con gusto. ¿Cuál es su fecha de entrada?"
 
         if sesion.intencion != "reservacion":
             return clasificar_intencion(mensaje)
@@ -95,31 +101,95 @@ class FlujoReservacion:
             if entrada is None:
                 return "reservacion", "No comprendí la fecha de entrada. Dígala con día, mes y año."
             datos.fecha_entrada = entrada
-            return "reservacion", "¿Qué día realizará su salida?"
+            return "reservacion", "¿Cuántas noches desea hospedarse?"
 
-        if datos.fecha_salida is None:
-            salida = extraer_fecha(mensaje, referencia=datos.fecha_entrada)
-            if salida is None or salida <= datos.fecha_entrada:
-                return "reservacion", "La salida debe ser posterior a la entrada. ¿Qué fecha será?"
-            datos.fecha_salida = salida
-            datos.numero_noches = (salida - datos.fecha_entrada).days
-            return "reservacion", "¿Prefiere habitación doble, king o suite?"
+        if datos.numero_noches is None:
+            noches = extraer_numero(mensaje)
+            if noches is None or noches < 1:
+                return "reservacion", "Indique una cantidad de noches mayor a cero."
+            datos.numero_noches = noches
+            datos.fecha_salida = datos.fecha_entrada.fromordinal(
+                datos.fecha_entrada.toordinal() + noches
+            )
+            return "reservacion", "¿Cuántas habitaciones desea reservar? El máximo es cuatro."
 
-        if datos.tipo_habitacion is None:
-            try:
-                datos.tipo_habitacion = normalizar_tipo(extraer_tipo(mensaje)).value
-            except ValueError:
-                return "reservacion", "Indique doble, king o suite."
-            return "reservacion", "¿Cuántos adultos se hospedarán?"
+        if datos.numero_habitaciones is None:
+            cantidad = extraer_numero(mensaje)
+            if cantidad is None or not 1 <= cantidad <= 4:
+                return "reservacion", "Indique entre una y cuatro habitaciones."
+            datos.numero_habitaciones = cantidad
+            return "reservacion", "¿Qué tipo desea para la habitación uno: doble, king o suite?"
 
-        if datos.numero_adultos is None:
-            adultos = extraer_numero(mensaje)
-            if adultos is None or not 1 <= adultos <= 20:
-                return "reservacion", "Indique cuántos adultos, entre uno y veinte."
-            datos.numero_adultos = adultos
+        if len(datos.habitaciones) < datos.numero_habitaciones:
+            respuesta = self._recopilar_habitacion(sesion, mensaje)
+            if respuesta:
+                return "reservacion", respuesta
+
+        if datos.hora_llegada is None:
+            llegada = extraer_hora(mensaje)
+            if llegada is None:
+                return (
+                    "reservacion",
+                    "Indique su hora aproximada de llegada, por ejemplo 6 de la tarde.",
+                )
+            datos.hora_llegada = llegada
             return "reservacion", self._consultar_y_responder(sesion)
 
         return "reservacion", self._consultar_y_responder(sesion)
+
+    def _recopilar_habitacion(self, sesion: SesionLlamada, mensaje: str) -> str | None:
+        datos = sesion.datos
+        numero = len(datos.habitaciones) + 1
+        if sesion.tipo_habitacion_actual is None:
+            try:
+                sesion.tipo_habitacion_actual = normalizar_tipo(extraer_tipo(mensaje)).value
+            except ValueError:
+                return "Indique doble, king o suite."
+            return f"¿Cuántos adultos ocuparán la habitación {numero}?"
+        if sesion.adultos_habitacion_actual is None:
+            adultos = extraer_numero(mensaje)
+            limite = 2 if sesion.tipo_habitacion_actual == "king" else 4
+            if adultos is None or not 1 <= adultos <= limite:
+                return f"Esa habitación admite entre uno y {limite} adultos."
+            sesion.adultos_habitacion_actual = adultos
+            return f"¿Cuántos niños de cero a once años ocuparán la habitación {numero}?"
+        if sesion.menores_habitacion_actual is None:
+            menores = extraer_numero(mensaje)
+            if menores is None or menores < 0:
+                return "Indique cuántos niños se hospedarán, incluso si son cero."
+            if sesion.adultos_habitacion_actual + menores > 4:
+                return "La ocupación total no puede superar cuatro personas. Indique menos niños."
+            sesion.menores_habitacion_actual = menores
+            if menores:
+                return "Diga las edades de los niños."
+            return self._completar_habitacion(sesion, [])
+        edades = extraer_numeros(mensaje)
+        if len(edades) != sesion.menores_habitacion_actual or any(edad > 11 for edad in edades):
+            return "Indique una edad de cero a once años por cada niño."
+        return self._completar_habitacion(sesion, edades)
+
+    def _completar_habitacion(self, sesion: SesionLlamada, edades: list[int]) -> str | None:
+        datos = sesion.datos
+        assert sesion.tipo_habitacion_actual and sesion.adultos_habitacion_actual
+        detalle = DetalleHabitacion(
+            tipo=sesion.tipo_habitacion_actual,
+            adultos=sesion.adultos_habitacion_actual,
+            edades_menores=edades,
+            precio_noche=calcular_precio_noche(
+                sesion.tipo_habitacion_actual, sesion.adultos_habitacion_actual
+            ),
+        )
+        datos.habitaciones.append(detalle)
+        sesion.tipo_habitacion_actual = None
+        sesion.adultos_habitacion_actual = None
+        sesion.menores_habitacion_actual = None
+        if len(datos.habitaciones) < (datos.numero_habitaciones or 0):
+            siguiente = len(datos.habitaciones) + 1
+            return f"¿Qué tipo desea para la habitación {siguiente}: doble, king o suite?"
+        datos.numero_adultos = sum(item.adultos for item in datos.habitaciones)
+        datos.numero_menores = sum(len(item.edades_menores) for item in datos.habitaciones)
+        datos.edades_menores = [edad for item in datos.habitaciones for edad in item.edades_menores]
+        return "¿A qué hora calcula llegar al hotel?"
 
     @staticmethod
     def _reiniciar_dato(sesion: SesionLlamada, cambio: str) -> str:
@@ -130,10 +200,16 @@ class FlujoReservacion:
             datos.numero_noches = None
             return "Claro. ¿Cuál será la nueva fecha de entrada?"
         if cambio == "habitacion":
-            datos.tipo_habitacion = None
-            return "Claro. ¿Prefiere habitación doble, king o suite?"
-        datos.numero_adultos = None
-        return "Claro. ¿Cuántos adultos se hospedarán?"
+            datos.habitaciones.clear()
+            sesion.tipo_habitacion_actual = None
+            sesion.adultos_habitacion_actual = None
+            sesion.menores_habitacion_actual = None
+            return "Claro. ¿Qué tipo desea para la habitación uno: doble, king o suite?"
+        datos.habitaciones.clear()
+        sesion.tipo_habitacion_actual = None
+        sesion.adultos_habitacion_actual = None
+        sesion.menores_habitacion_actual = None
+        return "Claro. Volvamos a distribuir los huéspedes. ¿Qué tipo desea para la habitación uno?"
 
     def _recopilar_contacto(self, sesion: SesionLlamada, mensaje: str) -> str:
         datos = sesion.datos
@@ -148,13 +224,6 @@ class FlujoReservacion:
             if not 10 <= len(telefono) <= 15:
                 return "Indique un teléfono de entre diez y quince dígitos."
             datos.telefono = telefono
-            return "¿Autoriza que el hotel le contacte para dar seguimiento a esta solicitud?"
-        if datos.consentimiento_contacto is None:
-            if es_negativo(mensaje):
-                datos.consentimiento_contacto = False
-                return "Sin su autorización no enviaré sus datos. ¿Desea comunicarse con recepción?"
-            if not es_afirmativo(mensaje):
-                return "Responda sí o no para autorizar el contacto."
             datos.consentimiento_contacto = True
             try:
                 return self._registrar_y_enviar(sesion)
@@ -169,20 +238,20 @@ class FlujoReservacion:
     def _registrar_y_enviar(self, sesion: SesionLlamada) -> str:
         entrada = sesion.datos.fecha_entrada
         salida = sesion.datos.fecha_salida
-        tipo = sesion.datos.tipo_habitacion
-        if not entrada or not salida or not tipo:
+        if not entrada or not salida or not sesion.datos.habitaciones:
             raise ValueError("Faltan datos para bloquear inventario")
         solicitud = SolicitudReservacion(
             identificador_llamada=sesion.identificador_llamada,
             datos=sesion.datos,
             resumen_conversacion="Solicitud recopilada por agente telefónico.",
             nivel_confianza=1,
+            estado=EstadoSolicitud.CONFIRMADA,
+            total_estimado=calcular_total(sesion.datos),
         )
-        self.disponibilidad.bloquear(
-            tipo,
+        self.disponibilidad.bloquear_varios(
+            dict(Counter(item.tipo for item in sesion.datos.habitaciones)),
             entrada,
             salida,
-            sesion.datos.numero_habitaciones,
             solicitud.identificador_solicitud,
         )
         transicionar(sesion, EstadoConversacion.GUARDAR_SOLICITUD)
@@ -209,21 +278,31 @@ class FlujoReservacion:
 
     def _consultar_y_responder(self, sesion: SesionLlamada) -> str:
         datos = sesion.datos
-        assert datos.fecha_entrada and datos.fecha_salida and datos.tipo_habitacion
+        assert datos.fecha_entrada and datos.fecha_salida and datos.habitaciones
         if sesion.estado_actual == EstadoConversacion.RECOPILAR_DATOS:
             transicionar(sesion, EstadoConversacion.VALIDAR_DATOS)
             transicionar(sesion, EstadoConversacion.CONSULTAR_DISPONIBILIDAD)
-        resultado = {
+        resultados = {
             item.tipo.value: item
             for item in self.disponibilidad.consultar(datos.fecha_entrada, datos.fecha_salida)
-        }[datos.tipo_habitacion]
+        }
         if sesion.estado_actual == EstadoConversacion.CONSULTAR_DISPONIBILIDAD:
             transicionar(sesion, EstadoConversacion.PRESENTAR_OPCIONES)
-        if resultado.disponibles < datos.numero_habitaciones:
-            return f"No hay habitaciones {datos.tipo_habitacion} disponibles en esas fechas."
+        cantidades = Counter(item.tipo for item in datos.habitaciones)
+        faltantes = [
+            tipo for tipo, cantidad in cantidades.items() if resultados[tipo].disponibles < cantidad
+        ]
+        if faltantes:
+            return "No hay disponibilidad para toda la reservación solicitada."
+        total = calcular_total(datos)
+        anticipo = (
+            " La llegada anticipada cuesta 200 pesos y depende de recepción."
+            if datos.hora_llegada and datos.hora_llegada < time(15, 0)
+            else ""
+        )
         return (
-            f"Hay {resultado.disponibles} habitaciones {datos.tipo_habitacion} disponibles. "
-            "¿Desea continuar con la solicitud?"
+            f"Sí hay disponibilidad. El total es de {total} pesos, IVA incluido."
+            f"{anticipo} ¿Desea confirmar la reservación?"
         )
 
 
@@ -274,6 +353,65 @@ def extraer_numero(mensaje: str) -> int | None:
         return int(coincidencia.group(1))
     palabras = set(re.findall(r"\w+", quitar_acentos(mensaje.casefold())))
     return next((valor for palabra, valor in NUMEROS.items() if palabra in palabras), None)
+
+
+def extraer_numeros(mensaje: str) -> list[int]:
+    """Extrae una secuencia de edades expresadas con dígitos o palabras."""
+    texto = quitar_acentos(mensaje.casefold())
+    encontrados: list[tuple[int, int]] = []
+    for coincidencia in re.finditer(r"\b\d{1,2}\b", texto):
+        encontrados.append((coincidencia.start(), int(coincidencia.group())))
+    for palabra, valor in NUMEROS.items():
+        for coincidencia in re.finditer(rf"\b{palabra}\b", texto):
+            encontrados.append((coincidencia.start(), valor))
+    return [valor for _, valor in sorted(encontrados)]
+
+
+def extraer_hora(mensaje: str) -> time | None:
+    """Interpreta horas telefónicas habituales en formato de 12 o 24 horas."""
+    texto = quitar_acentos(mensaje.casefold())
+    periodo = None
+    if "tarde" in texto or "noche" in texto or "pm" in texto:
+        periodo = "pm"
+    elif "manana" in texto or "am" in texto:
+        periodo = "am"
+    coincidencia = re.search(r"\b(\d{1,2})(?::(\d{2}))?\b", texto)
+    if coincidencia:
+        hora = int(coincidencia.group(1))
+        minuto = int(coincidencia.group(2) or 0)
+    else:
+        valores = [
+            (texto.find(palabra), valor)
+            for palabra, valor in NUMEROS.items()
+            if palabra != "cero" and re.search(rf"\b{palabra}\b", texto)
+        ]
+        if not valores:
+            return None
+        hora = min(valores)[1]
+        minuto = 0
+    if periodo == "pm" and hora < 12:
+        hora += 12
+    if periodo == "am" and hora == 12:
+        hora = 0
+    try:
+        return time(hora, minuto)
+    except ValueError:
+        return None
+
+
+def calcular_precio_noche(tipo: str, adultos: int) -> int:
+    if tipo == "doble":
+        return 700 if adultos <= 2 else 800
+    if tipo == "king":
+        return 700
+    if tipo == "suite":
+        return 900
+    raise ValueError("Tipo de habitación no reconocido")
+
+
+def calcular_total(datos) -> int:
+    assert datos.numero_noches
+    return sum(item.precio_noche for item in datos.habitaciones) * datos.numero_noches
 
 
 def es_afirmativo(mensaje: str) -> bool:

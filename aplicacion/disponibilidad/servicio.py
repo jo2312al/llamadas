@@ -120,6 +120,52 @@ class ServicioDisponibilidad:
             raise
         return identificador
 
+    def bloquear_varios(
+        self,
+        cantidades: dict[str | TipoHabitacion, int],
+        fecha_entrada: date,
+        fecha_salida: date,
+        referencia: str | None = None,
+    ) -> list[str]:
+        """Bloquea varias categorías en una sola transacción: todas o ninguna."""
+        self._validar_fechas(fecha_entrada, fecha_salida)
+        normalizadas = {normalizar_tipo(tipo): cantidad for tipo, cantidad in cantidades.items()}
+        if not normalizadas or any(cantidad < 1 for cantidad in normalizadas.values()):
+            raise ValueError("Las cantidades deben ser positivas")
+        identificadores: list[str] = []
+        try:
+            self.conexion.execute("BEGIN IMMEDIATE")
+            disponibles = {
+                item.tipo: item.disponibles for item in self.consultar(fecha_entrada, fecha_salida)
+            }
+            if any(disponibles[tipo] < cantidad for tipo, cantidad in normalizadas.items()):
+                raise ValueError("No hay suficientes habitaciones disponibles")
+            for tipo, cantidad in normalizadas.items():
+                identificador = str(uuid4())
+                identificadores.append(identificador)
+                self.conexion.execute(
+                    """
+                    INSERT INTO bloqueos_inventario
+                    (identificador_bloqueo, tipo, fecha_entrada, fecha_salida,
+                     cantidad, estado, referencia, fecha_creacion)
+                    VALUES (?, ?, ?, ?, ?, 'activo', ?, ?)
+                    """,
+                    (
+                        identificador,
+                        tipo,
+                        fecha_entrada.isoformat(),
+                        fecha_salida.isoformat(),
+                        cantidad,
+                        referencia,
+                        datetime.now(UTC).isoformat(),
+                    ),
+                )
+            self.conexion.commit()
+        except Exception:
+            self.conexion.rollback()
+            raise
+        return identificadores
+
     def liberar(self, identificador_bloqueo: str) -> bool:
         """Libera idempotentemente un bloqueo existente."""
         with self.conexion:

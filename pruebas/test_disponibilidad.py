@@ -43,6 +43,17 @@ def test_impide_sobreventa(servicio: ServicioDisponibilidad) -> None:
         servicio.bloquear("suite", entrada, salida)
 
 
+def test_bloqueo_multiple_es_atomico(servicio: ServicioDisponibilidad) -> None:
+    entrada, salida = date(2027, 10, 1), date(2027, 10, 2)
+    servicio.bloquear("suite", entrada, salida, cantidad=5)
+
+    with pytest.raises(ValueError, match="suficientes"):
+        servicio.bloquear_varios({"doble": 1, "suite": 1}, entrada, salida)
+
+    resultados = {item.tipo.value: item for item in servicio.consultar(entrada, salida)}
+    assert resultados["doble"].disponibles == 15
+
+
 def test_rechaza_tipo_y_fechas_invalidas(servicio: ServicioDisponibilidad) -> None:
     with pytest.raises(ValueError, match="no reconocido"):
         servicio.bloquear("presidencial", date(2027, 1, 1), date(2027, 1, 2))
