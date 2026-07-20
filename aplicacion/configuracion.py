@@ -20,6 +20,7 @@ class Configuracion(BaseModel):
     espera_api_reservas_segundos: float = Field(default=10, gt=0, le=60)
     binario_whisper: Path = Path("/usr/local/bin/whisper-cli")
     modelo_whisper: Path = Path("modelos/ggml-small-q5_1.bin")
+    modelo_vosk: Path | None = Path("modelos/vosk-model-small-es-0.42")
     binario_piper: Path = Path("/usr/local/bin/piper")
     modelo_piper: Path = Path("modelos/es_MX-claude-high.onnx")
     ruta_cache_audio: Path = Path("datos/cache_audio")

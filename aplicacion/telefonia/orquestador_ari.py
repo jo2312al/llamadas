@@ -110,7 +110,7 @@ class OrquestadorAri:
         audio = self.ruta_grabaciones / f"{nombre}.wav"
         try:
             self.cliente.descargar_grabacion(nombre, audio)
-            transcripcion = self.whisper.transcribir(audio)
+            transcripcion = self.whisper.transcribir(audio, sesion)
             sesion.ultimo_mensaje = transcripcion.texto
             self._responder(sesion, transcripcion.texto)
             REGISTRO.info(

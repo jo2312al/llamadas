@@ -34,7 +34,7 @@ class ServicioWhisper:
         self.espera_segundos = espera_segundos
         self.hilos = hilos
 
-    def transcribir(self, audio_wav: Path) -> Transcripcion:
+    def transcribir(self, audio_wav: Path, sesion=None) -> Transcripcion:
         """Transcribe un WAV y elimina siempre la salida temporal.
 
         Args:

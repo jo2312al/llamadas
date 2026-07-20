@@ -7,6 +7,7 @@ espera_ollama_segundos: 60
 espera_api_reservas_segundos: 10
 binario_whisper: /usr/local/bin/whisper-cli
 modelo_whisper: /opt/agente-telefonico-hotel/modelos/ggml-small-q5_1.bin
+modelo_vosk: /opt/agente-telefonico-hotel/modelos/vosk-model-small-es-0.42
 binario_piper: /usr/local/bin/piper
 modelo_piper: /opt/agente-telefonico-hotel/modelos/es_MX-claude-high.onnx
 ruta_cache_audio: datos/cache_audio

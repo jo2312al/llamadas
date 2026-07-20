@@ -17,6 +17,10 @@ from aplicacion.conversacion.flujo_reservacion import FlujoReservacion
 from aplicacion.disponibilidad.servicio import ServicioDisponibilidad
 from aplicacion.integraciones.api_reservas import ClienteApiReservas
 from aplicacion.lenguaje.cliente_ollama import ClienteOllama
+from aplicacion.reconocimiento_voz.servicio_hibrido import (
+    ServicioReconocimientoHibrido,
+    ServicioVosk,
+)
 from aplicacion.reconocimiento_voz.servicio_whisper import ServicioWhisper
 from aplicacion.sintesis_voz.cache_audio import CacheAudio
 from aplicacion.sintesis_voz.publicador_asterisk import PublicadorAudioAsterisk
@@ -90,6 +94,11 @@ async def _ejecutar_servicio_ari(configuracion: Configuracion) -> None:
         configuracion.modelo_whisper,
         configuracion.espera_whisper_segundos,
     )
+    reconocedor = whisper
+    if configuracion.modelo_vosk and configuracion.modelo_vosk.is_dir():
+        reconocedor = ServicioReconocimientoHibrido(
+            ServicioVosk(configuracion.modelo_vosk), whisper
+        )
     ollama = None
     if not configuracion.modo_simulacion:
         ollama = ClienteOllama(
@@ -133,7 +142,7 @@ async def _ejecutar_servicio_ari(configuracion: Configuracion) -> None:
                 cliente,
                 gestor,
                 configuracion.sonido_bienvenida,
-                whisper,
+                reconocedor,
                 configuracion.ruta_cache_audio / "grabaciones",
                 ollama,
                 piper,
