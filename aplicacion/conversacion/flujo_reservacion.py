@@ -3,7 +3,7 @@
 import re
 import unicodedata
 from collections import Counter
-from datetime import date, time
+from datetime import date, time, timedelta
 
 from aplicacion.base_datos.repositorio_reservaciones import guardar_solicitud
 from aplicacion.conversacion.maquina_estados import transicionar
@@ -44,6 +44,31 @@ NUMEROS = {
     "ocho": 8,
     "nueve": 9,
     "diez": 10,
+}
+DIAS_HABLADOS = {
+    **NUMEROS,
+    "once": 11,
+    "doce": 12,
+    "trece": 13,
+    "catorce": 14,
+    "quince": 15,
+    "dieciseis": 16,
+    "diecisiete": 17,
+    "dieciocho": 18,
+    "diecinueve": 19,
+    "veinte": 20,
+    "veintiuno": 21,
+    "veintiun": 21,
+    "veintidos": 22,
+    "veintitres": 23,
+    "veinticuatro": 24,
+    "veinticinco": 25,
+    "veintiseis": 26,
+    "veintisiete": 27,
+    "veintiocho": 28,
+    "veintinueve": 29,
+    "treinta": 30,
+    "treinta y uno": 31,
 }
 
 
@@ -99,7 +124,10 @@ class FlujoReservacion:
         if datos.fecha_entrada is None:
             entrada = extraer_fecha(mensaje)
             if entrada is None:
-                return "reservacion", "No comprendí la fecha de entrada. Dígala con día, mes y año."
+                return (
+                    "reservacion",
+                    "No comprendí la fecha de entrada. Puede decir hoy, mañana o el día y mes.",
+                )
             datos.fecha_entrada = entrada
             return "reservacion", "¿Cuántas noches desea hospedarse?"
 
@@ -317,27 +345,48 @@ def clasificar_intencion(mensaje: str) -> tuple[str, str]:
 
 
 def extraer_fecha(mensaje: str, referencia: date | None = None) -> date | None:
-    """Extrae fechas ISO, numéricas o españolas con año explícito."""
+    """Extrae fechas absolutas o relativas y completa el año cuando se omite."""
     texto = quitar_acentos(mensaje.casefold())
+    referencia = referencia or date.today()
+    if re.search(r"\bpasado manana\b", texto):
+        return referencia + timedelta(days=2)
+    if re.search(r"\bmanana\b", texto):
+        return referencia + timedelta(days=1)
+    if re.search(r"\bhoy\b", texto):
+        return referencia
     if coincidencia := re.search(r"\b(20\d{2})[-/](\d{1,2})[-/](\d{1,2})\b", texto):
         valores = map(int, coincidencia.groups())
         return _crear_fecha(*valores)
     if coincidencia := re.search(r"\b(\d{1,2})[/-](\d{1,2})[/-](20\d{2})\b", texto):
         dia, mes, ano = map(int, coincidencia.groups())
         return _crear_fecha(ano, mes, dia)
+    if coincidencia := re.search(r"\b(\d{1,2})[/-](\d{1,2})\b", texto):
+        dia, mes = map(int, coincidencia.groups())
+        return _fecha_sin_ano(dia, mes, referencia)
     meses = "|".join(MESES)
+    dias = "|".join(sorted(DIAS_HABLADOS, key=len, reverse=True))
     if coincidencia := re.search(
-        rf"\b(\d{{1,2}})\s+(?:de\s+)?({meses})(?:\s+(?:de\s+)?(20\d{{2}}))?\b", texto
+        rf"\b(\d{{1,2}}|{dias})\s+(?:de\s+)?({meses})(?:\s+(?:de\s+)?(20\d{{2}}))?\b",
+        texto,
     ):
-        dia = int(coincidencia.group(1))
+        valor_dia = coincidencia.group(1)
+        dia = int(valor_dia) if valor_dia.isdigit() else DIAS_HABLADOS[valor_dia]
         mes = MESES[coincidencia.group(2)]
         ano = int(coincidencia.group(3)) if coincidencia.group(3) else None
-        if ano is None and referencia:
-            ano = referencia.year + (mes < referencia.month)
         if ano is None:
-            return None
+            return _fecha_sin_ano(dia, mes, referencia)
         return _crear_fecha(ano, mes, dia)
     return None
+
+
+def _fecha_sin_ano(dia: int, mes: int, referencia: date) -> date | None:
+    """Elige la siguiente ocurrencia válida de un día y mes."""
+    candidata = _crear_fecha(referencia.year, mes, dia)
+    if candidata is None:
+        return None
+    if candidata < referencia:
+        candidata = _crear_fecha(referencia.year + 1, mes, dia)
+    return candidata
 
 
 def extraer_tipo(mensaje: str) -> str:

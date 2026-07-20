@@ -32,6 +32,17 @@ def test_extrae_fechas_y_numeros_hablados() -> None:
     assert calcular_precio_noche("doble", 3) == 800
 
 
+def test_extrae_fechas_relativas_sin_ano_y_con_dia_hablado() -> None:
+    referencia = date(2026, 7, 20)
+    assert extraer_fecha("hoy", referencia) == date(2026, 7, 20)
+    assert extraer_fecha("mañana", referencia) == date(2026, 7, 21)
+    assert extraer_fecha("pasado mañana", referencia) == date(2026, 7, 22)
+    assert extraer_fecha("el veinte de julio", referencia) == date(2026, 7, 20)
+    assert extraer_fecha("treinta y uno de julio", referencia) == date(2026, 7, 31)
+    assert extraer_fecha("15 de agosto", referencia) == date(2026, 8, 15)
+    assert extraer_fecha("10/7", referencia) == date(2027, 7, 10)
+
+
 def test_varias_habitaciones_ninos_y_total(tmp_path: Path) -> None:
     flujo, _ = crear_flujo(tmp_path)
     sesion = SesionLlamada(identificador_llamada="llamada-multiple")
